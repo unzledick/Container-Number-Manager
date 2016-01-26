@@ -1,0 +1,63 @@
+{
+  "Hardware":{
+    "NumberOfServer": 2,
+    "ServerInfo": [
+      {
+        "ServerID": 0,
+        "CoreInfo": {
+          "NumberOfCore": 2,
+          "Content":[
+            {
+              "CoreID": 0,
+              "load": 0.8
+            },
+            {
+              "CoreID": 1,
+              "load": 0.79
+            }
+          ]
+        },
+        "MemInfo":{
+          "SizeOfMem": 1024,
+          "CurrUsage": 512
+        },
+        "DiskInfo":{},
+        "NetworkInfo":{
+      }
+      },
+      {
+        "ServerID": 1,
+        "..." : "..."
+      }
+    ]
+  },
+  "Application": [
+    {
+      "ApplicationID": 0,
+      "AvgResponseTime": 0.6,
+      "SLA": 1.0,
+      "Container": {
+        "NumberOfContainer": 3,
+        "ContainerInfo": [
+          {
+            "ContainerID": "App0_0",
+            "OnServer" : "Server0",
+            "CoreUsed": 2,
+            "load": 0.9,
+            "..." : "..."
+          },
+          {
+            "ContainerID": "App0_1",
+            "..." : "..."
+          },
+          {
+            "..." : "..."
+          }
+        ]
+      }
+    },
+    {
+      "ApplicationID": 1
+    }
+  ]
+}
