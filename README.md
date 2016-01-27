@@ -36,8 +36,8 @@ make Container_Number_Manager
    
    
 ## format.json  
-為目前使用的machine imformation輸入格式  
+目前使用的machine imformation輸入格式  
    
    
 ## example.json & format_original.json  
-為其他版本的machine imformation輸入格式  
+其他版本的machine imformation輸入格式  
