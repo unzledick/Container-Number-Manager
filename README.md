@@ -39,5 +39,5 @@ make Container_Number_Manager
 為目前使用的machine imformation輸入格式  
    
    
-## example.json 跟 format_original.json  
+## example.json & format_original.json  
 為其他版本的machine imformation輸入格式  
