@@ -2,7 +2,7 @@
    
    
 ## make_SLA_json.cpp:  
-將處理好的AP level imformation輸出至 SLA.json  
+將處理好的 AP level imformation 輸出至 SLA.json  
 (名字待修改)  
 ##### Compile:  
 ```
@@ -20,9 +20,9 @@ make make_SLA_json
    
    
 ## Container_Number_Manager.cpp:  
-* 讀入 SLA.json 的AP level imformation,儲存於map中 (執行會印出結果）  
-* 讀入format.json中的machine imformation並儲存於structure中 (執行會印出結果）  
-* 目前 Container_Number_Manager.cpp 的parser跟structure是針對 format.json 來寫,  
+* 讀入 SLA.json 的 AP level imformation,儲存於 map 中 (執行會印出結果）  
+* 讀入 format.json 中的 machine imformation 並儲存於 structure 中 (執行會印出結果）  
+* 目前 Container_Number_Manager.cpp 的 parser 跟 structure 是針對 format.json 來寫,  
 所以input為 example.json 或 format_original.json 時不會成功   
 
 ##### Compile:   
@@ -36,8 +36,8 @@ make Container_Number_Manager
    
    
 ## format.json  
-目前使用的machine imformation輸入格式  
+目前使用的 machine imformation 輸入格式  
    
    
 ## example.json & format_original.json  
-其他版本的machine imformation輸入格式  
+其他版本的 machine imformation 輸入格式  
