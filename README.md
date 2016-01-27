@@ -15,8 +15,8 @@
   compile: make Container_Number_Manager
   執行: ./Container_Number_Manager.o format.json
 
-# format.json 為目前使用的machine imformation輸入格式
+format.json 為目前使用的machine imformation輸入格式
 
-# example.json 跟 format_original.json 為其他版本的machine imformation輸入格式
+example.json 跟 format_original.json 為其他版本的machine imformation輸入格式
 
   
