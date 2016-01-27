@@ -20,8 +20,8 @@ make make_SLA_json
    
    
 ## Container_Number_Manager.cpp:  
-* 讀入 SLA.json 的AP level imformation,儲存於map中  
-* 讀入format.json中的machine imformation並儲存於structure中  
+* 讀入 SLA.json 的AP level imformation,儲存於map中(執行會印出結果）  
+* 讀入format.json中的machine imformation並儲存於structure中(執行會印出結果）  
 * 目前 Container_Number_Manager.cpp 的parser跟structure是針對 format.json 來寫,  
 所以input為 example.json 或 format_original.json 時不會成功   
 
