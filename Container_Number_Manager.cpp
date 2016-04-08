@@ -1,105 +1,55 @@
+#include <cstdio>
 #include <fstream>
 #include <iostream>
-#include <string.h>
+#include <string>
 #include <map>
+
 #include "json/json.h"
 
 #define CURRENT_KNOWN
 
-using namespace std;
+typedef std::map<std::string, std::map<std::string, double>*> rules;
 
-/*
- *  structures for storing imformation about server and application
- */
-struct CoreContent{
-	int CoreID;
-	double load;
-};    
+rules rules_server;
+rules rules_application;
 
-struct CoreInfo{
-	int NumberOfCore;
-	struct CoreContent *coreContent;
-};
+void construct_rules(Json::Value root, rules* r) {
+	std::cout << root.size() << std::endl;
+	for (Json::Value::iterator it = root.begin(); it != root.end(); it++) {
 
-struct MemInfo{
-	int SizeOfMem;
-	int CurrUsage;
-};
-
-struct DiskInfo{
-};
-
-struct NetworkInfo{
-};        
-
-struct ServerInfo{
-	int ServerID;
-	struct CoreInfo coreInfo;
-	struct MemInfo memInfo;
-	struct DiskInfo diskInfo;
-	struct NetworkInfo networkInfo;
-};
-
-struct Hardware{
-	int NumberOfServer;
-	struct ServerInfo *serverInfo;
-};
-
-struct ContainerInfo{
-	string ContainerID;
-	string OnServer;
-	int CoreUsed;
-	double load;    
-};
-
-struct Container{
-	int NumberOfContainer;
-	struct ContainerInfo *containerInfo;
-};    
-
-struct Application{
-	int ApplicationID;
-	double AvgResponseTime;
-	double SLA;
-	struct Container container;
-};
-
-struct Hardware hardware;
-struct Application *application;
-
-int NumberOfApplication;
-map<string, int> map_SLA;
-
-
-/*
- *   init: read the SLA from file
- */
-void init(){
-	Json::Reader reader;
-	Json::Value root;
-
-	ifstream is;
-	is.open("SLA.json", ios::binary);
-	
-	if(reader.parse(is,root)){
-		map_SLA["a"] = root["a"].asInt();
-		map_SLA["b"] = root["b"].asInt();
-		map_SLA["c"] = root["c"].asInt(); 
+		std::cout << it.name() << std::endl;
 	}
 }
-    
-/*
- *   check if init is right
- */
-void check_init(){
-	printf("map_SLA[a] = %d\n", map_SLA["a"]);
-	printf("map_SLA[b] = %d\n", map_SLA["b"]);
-	printf("map_SLA[c] = %d\n", map_SLA["c"]);
-}	
+
+void construct_rules_from_file(Json::Value root) {
+	// [TODO] change to root["server"]
+	if (!root["a"].isNull()) {		
+		construct_rules(root["a"], &rules_server);		
+	}
+	// [TODO] change to root["application"]
+	if (!root["b"].isNull()) {
+		construct_rules(root["b"], &rules_application);
+	}
+}
+
+void read_rules_from_file(){
+	Json::Reader reader;
+	Json::Value root;
+	std::ifstream is;
+
+	is.open("SLA.json", std::ios::in);
+	
+	if(is && reader.parse(is, root)){		
+		construct_rules_from_file(root);		
+	}
+
+	is.close();
+}
 
 /*
  *   parser: parse the imformation from json file
  */
+/*
 void parser(char* filename){
 
 	Json::Reader reader;
@@ -156,10 +106,11 @@ void parser(char* filename){
 	}
 
 }
-
+*/
 /*
  *   print imformation stored from parser to check if they are right.
  */
+/*
 void print_parser(){
 	printf("Number of Server: %d\n",hardware.NumberOfServer);
 
@@ -192,13 +143,22 @@ void print_parser(){
 		}
 	}    
 }
+*/
+void init_rules() {
+	rules_server.clear();
+	rules_application.clear();
+
+	read_rules_from_file();
+}
 
 int main(int argc, char *argv[])
 {
-	init();
-	check_init();
+	init_rules();	
 
-	parser(argv[1]);
-	print_parser();
+	while (1) {
+		//	parser(argv[1]);
+		//	print_parser();
+	};
+
 	return 0;
 }
