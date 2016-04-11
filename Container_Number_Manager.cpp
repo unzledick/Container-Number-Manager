@@ -6,7 +6,7 @@
 
 #include "json/json.h"
 
-#define CURRENT_KNOWN
+//#define CURRENT_KNOWN
 
 typedef std::map<std::string, std::map<std::string, double>*> rule_set;
 typedef std::map<std::string, double> rules;
@@ -15,6 +15,79 @@ typedef std::pair<std::string, double> theshold_pair;
 
 rule_set ruleset_server;
 rule_set ruleset_application;
+
+bool monitorDataUpdate() {
+	// [TODO] check if there are monitor data
+	return true;
+}
+
+std::string query_server_type(std::string server_id) {
+	// [TODO] return the type of a server
+	return "type_1";
+}
+bool check_cpu(Json::Value root, rules* r) {
+	bool result = true;
+	rules::iterator it;
+	if (!root["Load"].isNull() 
+		&& ((it = r->find("CPU load")) != r->end())
+		&& (root["Load"].asDouble() > it->second)) {
+		std::cerr << "\tCPU overload" << std::endl;
+		result = false;
+	}
+	return result;
+}
+bool check_mem(Json::Value root, rules* r) {
+	bool result = true;
+	// [TODO]
+	return result;
+}
+bool check_disk(Json::Value root, rules* r) {
+	bool result = true;
+	// [TODO]
+	return result;
+}
+bool chech_network(Json::Value root, rules* r) {
+	bool result = true;
+	// [TODO]
+	return result;
+}
+
+void parse_server(Json::Value root) {
+	std::string server_id = root["ServerID"].asString();
+	std::string server_type = query_server_type(server_id);
+	rules* r = ruleset_server[server_type];
+	bool normal = true;
+
+	std::cout << "Checking server " << server_id << "..." << std::endl;
+
+	normal &= check_cpu(root["CoreInfo"], r);
+	normal &= check_mem(root["MemInfo"], r);
+	normal &= check_disk(root["DiskInfo"], r);
+	normal &= chech_network(root["NetworkInfo"], r);
+
+	if (normal) {
+		std::cout << "Normal" << std::endl;
+	}
+}
+
+void analyze_data_server(Json::Value root) {
+	//int server_amount = root["NumberOfServer"].asInt();
+	Json::Value servers = root["ServerInfo"];
+	for (int i = 0; i < servers.size(); i++) {
+		parse_server(servers[i]);
+	}
+}
+
+void analyze_data(Json::Value root) {
+	if (!root["Hardware"].isNull()) {
+		analyze_data_server(root["Hardware"]);
+	}
+	if (!root["Application"].isNull()) {
+		// [TODO]
+		//analyze_data_applicaiton(root["Application"]);
+	}
+}
+
 
 rules* parse_rules(Json::Value root) {
 	rules* thresholds = new rules();	
@@ -65,117 +138,22 @@ void read_json_tree_from_file(std::string fname, Json::Value* root){
 	}
 }
 
-/*
- *   parser: parse the imformation from json file
- */
-/*
-void parser(char* filename){
-
-	Json::Reader reader;
-	Json::Value root;
-
-	ifstream is;
-	is.open(filename, ios::binary);
-
-	if(reader.parse(is,root)){
-		hardware.NumberOfServer = root["Hardware"]["NumberOfServer"].asInt();
-		hardware.serverInfo = (ServerInfo*)malloc(hardware.NumberOfServer*sizeof(ServerInfo));
-
-		for(int i = 0; i< hardware.NumberOfServer;i++){
-			hardware.serverInfo[i].ServerID = root["Hardware"]["ServerInfo"][i]["ServerID"].asInt();            
-			hardware.serverInfo[i].coreInfo.NumberOfCore = 
-				root["Hardware"]["ServerInfo"][i]["CoreInfo"]["NumberOfCore"].asInt();
-			hardware.serverInfo[i].coreInfo.coreContent = (CoreContent*)
-				malloc(hardware.serverInfo[i].coreInfo.NumberOfCore*sizeof(CoreContent)); 
-
-			for(int j = 0; j < hardware.serverInfo[i].coreInfo.NumberOfCore;j++){    
-				hardware.serverInfo[i].coreInfo.coreContent[j].CoreID = 
-					root["Hardware"]["ServerInfo"][i]["CoreInfo"]["Content"][j]["CoreID"].asInt();
-				hardware.serverInfo[i].coreInfo.coreContent[j].load =
-					root["Hardware"]["ServerInfo"][i]["CoreInfo"]["Content"][j]["load"].asDouble();
-			}
-
-			hardware.serverInfo[i].memInfo.SizeOfMem = 
-				root["Hardware"]["ServerInfo"][i]["MemInfo"]["SizeOfMem"].asInt();
-			hardware.serverInfo[i].memInfo.CurrUsage =
-				root["Hardware"]["ServerInfo"][i]["MemInfo"]["CurrUsage"].asInt();    
-		}
-
-		NumberOfApplication = root["Application"].size();
-		application = (Application*)malloc(NumberOfApplication*sizeof(Application));
-
-		for(int i = 0; i< NumberOfApplication;i++){
-			application[i].ApplicationID = root["Application"][i]["ApplicationID"].asInt();
-			application[i].AvgResponseTime = root["Application"][i]["AvgResponseTime"].asDouble();
-			application[i].SLA = root["Application"][i]["SLA"].asDouble();
-			application[i].container.NumberOfContainer = root["Application"][i]["Container"]["NumberOfContainer"].asInt();
-			application[i].container.containerInfo = (ContainerInfo*)malloc(application[i].container.NumberOfContainer*sizeof(ContainerInfo));
-
-			for(int j = 0; j < application[i].container.NumberOfContainer;j++){
-				application[i].container.containerInfo[j].ContainerID = root["Application"][i]["Container"]["ContainerInfo"][j]["ContainerID"].asString();
-				application[i].container.containerInfo[j].OnServer = root["Application"][i]["Container"]["ContainerInfo"][j]["OnServer"].asString();
-				application[i].container.containerInfo[j].CoreUsed = root["Application"][i]["Container"]["ContainerInfo"][j]["CoreUsed"].asInt();
-				application[i].container.containerInfo[j].load = root["Application"][i]["Container"]["ContainerInfo"][j]["load"].asDouble();
-
-
-
-			}     
-		}
-
-	}
-
-}
-*/
-/*
- *   print imformation stored from parser to check if they are right.
- */
-/*
-void print_parser(){
-	printf("Number of Server: %d\n",hardware.NumberOfServer);
-
-	for(int i = 0; i< hardware.NumberOfServer;i++){
-		printf("\n");
-		printf("Server ID: %d\n",hardware.serverInfo[i].ServerID);
-		printf("Number of core:: %d\n",hardware.serverInfo[i].coreInfo.NumberOfCore);
-
-		for(int j = 0; j < hardware.serverInfo[i].coreInfo.NumberOfCore;j++){
-			printf("*CoreID: %d\n",hardware.serverInfo[i].coreInfo.coreContent[j].CoreID);
-			printf("load: %f\n",hardware.serverInfo[i].coreInfo.coreContent[j].load);
-		}
-
-		printf("Size of Mem: %d\n",hardware.serverInfo[i].memInfo.SizeOfMem);
-		printf("Current Usage: %d\n",hardware.serverInfo[i].memInfo.CurrUsage);
-	}
-
-	for(int i = 0; i<NumberOfApplication;i++){
-		printf("\n");
-		printf("Application ID: %d\n", application[i].ApplicationID);
-		printf("AvgResponseTime: %f\n", application[i].AvgResponseTime);
-		printf("SLA: %f\n", application[i].SLA);
-		printf("Number of container: %d\n", application[i].container.NumberOfContainer);
-
-		for(int j = 0; j < application[i].container.NumberOfContainer;j++){
-			cout <<"*Container ID: " << application[i].container.containerInfo[j].ContainerID << endl;
-			cout << "On server: " <<application[i].container.containerInfo[j].OnServer << endl;
-			printf("CoreUsed: %d\n", application[i].container.containerInfo[j].CoreUsed);
-			printf("load: %f\n", application[i].container.containerInfo[j].load);
-		}
-	}    
-}
-*/
-
 int main(int argc, char *argv[])
 {
 	Json::Value root;
 
 	read_json_tree_from_file("tmp_SLA.json", &root);
-	
 	construct_rule_sets_from_tree(root);
 
-	//while (1) {
-		//	parser(argv[1]);
-		//	print_parser();
-	//};
+	while (1) {		
+		if (!monitorDataUpdate()) {
+			continue;
+		}
+
+		read_json_tree_from_file("example.json", &root);
+		analyze_data(root);
+		
+	};
 
 	return 0;
 }
