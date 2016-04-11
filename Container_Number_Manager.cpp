@@ -8,42 +8,61 @@
 
 #define CURRENT_KNOWN
 
-typedef std::map<std::string, std::map<std::string, double>*> rules;
+typedef std::map<std::string, std::map<std::string, double>*> rule_set;
+typedef std::map<std::string, double> rules;
+typedef std::pair<std::string, rules*> ruleset_pair;
+typedef std::pair<std::string, double> theshold_pair;
 
-rules rules_server;
-rules rules_application;
+rule_set ruleset_server;
+rule_set ruleset_application;
 
-void construct_rules(Json::Value root, rules* r) {
-	std::cout << root.size() << std::endl;
+rules* parse_rules(Json::Value root) {
+	rules* thresholds = new rules();	
 	for (Json::Value::iterator it = root.begin(); it != root.end(); it++) {
+		std::string threshold_name = it.key().asString();
+		double threshold_value = (*it).asDouble();
+		thresholds->insert(theshold_pair(threshold_name, threshold_value));
+	}
+	return thresholds;
+}
 
-		std::cout << it.name() << std::endl;
+void construct_rule_set(Json::Value root, rule_set* rs) {
+	rs->clear();	
+	for (Json::Value::iterator it = root.begin(); it != root.end(); it++) {
+		std::string item_name = it.name();
+		if ((*it).size() > 0
+			&& rs->find(item_name) == rs->end()){
+			rules* item_rules = parse_rules((*it));
+			rs->insert(ruleset_pair(item_name, item_rules));
+		}
 	}
 }
 
-void construct_rules_from_file(Json::Value root) {
-	// [TODO] change to root["server"]
-	if (!root["a"].isNull()) {		
-		construct_rules(root["a"], &rules_server);		
-	}
-	// [TODO] change to root["application"]
-	if (!root["b"].isNull()) {
-		construct_rules(root["b"], &rules_application);
+void construct_rule_sets_from_tree(Json::Value root) {	
+	if (!root["server"].isNull()) {		
+		construct_rule_set(root["server"], &ruleset_server);
+	}	
+	if (!root["application"].isNull()) {
+		construct_rule_set(root["application"], &ruleset_application);
 	}
 }
 
-void read_rules_from_file(){
-	Json::Reader reader;
-	Json::Value root;
+void read_json_tree_from_file(std::string fname, Json::Value* root){
+	Json::Reader reader;	
 	std::ifstream is;
 
-	is.open("SLA.json", std::ios::in);
-	
-	if(is && reader.parse(is, root)){		
-		construct_rules_from_file(root);		
-	}
+	is.exceptions(std::ifstream::failbit | std::ifstream::badbit);
 
-	is.close();
+	try {
+		is.open(fname, std::ios::in);
+		if (is.is_open()) {
+			reader.parse(is, (*root));
+		}
+		is.close();
+	}
+	catch(std::ios_base::failure e){
+		std::cerr << "Exceptions on opening/reading file:" << fname << std::endl;
+	}
 }
 
 /*
@@ -144,21 +163,19 @@ void print_parser(){
 	}    
 }
 */
-void init_rules() {
-	rules_server.clear();
-	rules_application.clear();
-
-	read_rules_from_file();
-}
 
 int main(int argc, char *argv[])
 {
-	init_rules();	
+	Json::Value root;
 
-	while (1) {
+	read_json_tree_from_file("tmp_SLA.json", &root);
+	
+	construct_rule_sets_from_tree(root);
+
+	//while (1) {
 		//	parser(argv[1]);
 		//	print_parser();
-	};
+	//};
 
 	return 0;
 }
