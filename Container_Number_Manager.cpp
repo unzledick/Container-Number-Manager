@@ -14,6 +14,7 @@
 #endif // __unix__
 
 #define	FILE_RULES	"tmp_SLA.json"
+#define FILE_SERVER	"serverType.json"
 #define	FILE_MDATA	"example.json"
 
 #define STR_SERVER	"Server"
@@ -29,15 +30,36 @@ typedef std::pair<std::string, double> theshold_pair;
 rule_set ruleset_server;
 rule_set ruleset_application;
 
+std::map<std::string, std::string> type_server;
+
 bool monitorDataUpdate() {
 	// [TODO] check if there are monitor data
 	return true;
 }
 
 std::string query_server_type(std::string server_id) {
-	// [TODO] return the type of a server
-	return "type_1";
+	std::string server_type = "";
+	if (type_server.find(server_id) != type_server.end()){
+		server_type = type_server[server_id];
+	}
+	return server_type;
 }
+
+void build_server_type_mapping(Json::Value root) {
+	std::string type;
+	std::string name;
+
+	type_server.clear();
+
+	for (Json::Value::iterator it = root.begin(); it != root.end(); it++) {
+		type = it.key().asString();
+		for (Json::Value::iterator it2 = it->begin(); it2 != it->end(); it2++) {
+			name = it2->asString();
+			type_server.insert(std::pair<std::string, std::string>(name, type));
+		}
+	}
+}
+
 bool check_cpu(Json::Value root, rules* r) {
 	bool result = true;
 	rules::iterator it;
@@ -92,10 +114,10 @@ void analyze_data_server(Json::Value root) {
 }
 
 void analyze_data(Json::Value root) {
-	if (!root["Hardware"].isNull()) {
-		analyze_data_server(root["Hardware"]);
+	if (!root[STR_SERVER].isNull()) {
+		analyze_data_server(root[STR_SERVER]);
 	}
-	if (!root["Application"].isNull()) {
+	if (!root[STR_APPLICATION].isNull()) {
 		// [TODO]
 		//analyze_data_applicaiton(root["Application"]);
 	}
@@ -120,7 +142,11 @@ rules* parse_rules(Json::Value root) {
 }
 
 void construct_rule_set(Json::Value root, rule_set* rs) {
-	rs->clear();	
+	rules* default_rules = new rules();
+
+	rs->clear();
+	rs->insert(ruleset_pair("", default_rules));
+
 	for (Json::Value::iterator it = root.begin(); it != root.end(); it++) {
 		std::string item_name = it.name();
 		if ((*it).size() > 0
@@ -170,6 +196,10 @@ int main(int argc, char *argv[])
 		construct_rule_sets_from_tree(root);
 	}
 
+	read_success = read_json_tree_from_file(FILE_SERVER, &root);
+	build_server_type_mapping(root);
+
+
 	// [TODO] fork a child as daemon to do the following
 
 	while (1) {
@@ -178,9 +208,10 @@ int main(int argc, char *argv[])
 			continue;
 		}
 
-		read_json_tree_from_file(FILE_MDATA, &root);
-		analyze_data(root);
-		
+		read_success = read_json_tree_from_file(FILE_MDATA, &root);
+		if (read_success) {
+			analyze_data(root);
+		}		
 	};
 
 	return 0;
