@@ -6,7 +6,20 @@
 
 #include "json/json.h"
 
-//#define CURRENT_KNOWN
+#ifdef __unix__
+#include <unistd.h>
+#elif _WIN32 || _WIN64
+#define WINDOWS
+#include <windows.h>
+#endif // __unix__
+
+#define	FILE_RULES	"tmp_SLA.json"
+#define	FILE_MDATA	"example.json"
+
+#define STR_SERVER	"Server"
+#define STR_APPLICATION	"Application"
+
+#define T_SLEEP_MS	500
 
 typedef std::map<std::string, std::map<std::string, double>*> rule_set;
 typedef std::map<std::string, double> rules;
@@ -88,6 +101,13 @@ void analyze_data(Json::Value root) {
 	}
 }
 
+void go_to_sleep() {
+#ifdef WINDOWS
+	Sleep(T_SLEEP_MS);
+#else
+	usleep(T_SLEEP_MS);
+#endif
+}
 
 rules* parse_rules(Json::Value root) {
 	rules* thresholds = new rules();	
@@ -112,15 +132,15 @@ void construct_rule_set(Json::Value root, rule_set* rs) {
 }
 
 void construct_rule_sets_from_tree(Json::Value root) {	
-	if (!root["server"].isNull()) {		
-		construct_rule_set(root["server"], &ruleset_server);
+	if (!root[STR_SERVER].isNull()) {
+		construct_rule_set(root[STR_SERVER], &ruleset_server);
 	}	
-	if (!root["application"].isNull()) {
-		construct_rule_set(root["application"], &ruleset_application);
+	if (!root[STR_APPLICATION].isNull()) {
+		construct_rule_set(root[STR_APPLICATION], &ruleset_application);
 	}
 }
 
-void read_json_tree_from_file(std::string fname, Json::Value* root){
+bool read_json_tree_from_file(std::string fname, Json::Value* root){
 	Json::Reader reader;	
 	std::ifstream is;
 
@@ -135,22 +155,30 @@ void read_json_tree_from_file(std::string fname, Json::Value* root){
 	}
 	catch(std::ios_base::failure e){
 		std::cerr << "Exceptions on opening/reading file:" << fname << std::endl;
+		return false;
 	}
+	return true;
 }
 
 int main(int argc, char *argv[])
 {
 	Json::Value root;
+	bool read_success = false;
 
-	read_json_tree_from_file("tmp_SLA.json", &root);
-	construct_rule_sets_from_tree(root);
+	read_success = read_json_tree_from_file(FILE_RULES, &root);
+	if (read_success) {
+		construct_rule_sets_from_tree(root);
+	}
 
-	while (1) {		
+	// [TODO] fork a child as daemon to do the following
+
+	while (1) {
 		if (!monitorDataUpdate()) {
+			go_to_sleep();
 			continue;
 		}
 
-		read_json_tree_from_file("example.json", &root);
+		read_json_tree_from_file(FILE_MDATA, &root);
 		analyze_data(root);
 		
 	};

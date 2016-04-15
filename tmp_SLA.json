@@ -1,18 +1,18 @@
 {
-  "server": {
-    "type_1": {
+  "Server": {
+    "Type_1": {
       "CPU load": 0.8,
       "Memory": 1024
     },
-    "type_2": {
+    "Type_2": {
       "CPU load": 0.9,
       "Memory": 2048,
-      "network": 10
+      "Network": 10
     }
   },
-  "application": {
+  "Application": {
       "Web":{
-          "response time": 3.0
+          "Response time": 3.0
       }
   }
 }
