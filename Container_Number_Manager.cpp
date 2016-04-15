@@ -13,7 +13,7 @@
 #include <windows.h>
 #endif // __unix__
 
-#define	FILE_RULES	"tmp_SLA.json"
+#define	FILE_RULES	"SLA.json"
 #define FILE_SERVER	"serverType.json"
 #define	FILE_MDATA	"example.json"
 
@@ -62,18 +62,40 @@ void build_server_type_mapping(Json::Value root) {
 
 bool check_cpu(Json::Value root, rules* r) {
 	bool result = true;
-	rules::iterator it;
-	if (!root["Load"].isNull() 
-		&& ((it = r->find("CPU load")) != r->end())
-		&& (root["Load"].asDouble() > it->second)) {
-		std::cerr << "\tCPU overload" << std::endl;
+
+	if (root["Load"].isNull() || root["NumberOfCore"].isNull()) {
+		std::cerr << "\tCPU load information missing" << std::endl;
 		result = false;
+	}
+	else{
+		rules::iterator it;
+		double avgLoad = root["Load"].asDouble() / root["NumberOfCore"].asDouble();
+		
+		if ((it = r->find("CPU load")) != r->end()
+			&& (avgLoad > it->second)) {
+			std::cerr << "\tCPU load exceeds threshold" << std::endl;
+			result = false;
+		}
 	}
 	return result;
 }
 bool check_mem(Json::Value root, rules* r) {
 	bool result = true;
-	// [TODO]
+
+	if (root["SizeOfMem"].isNull() || root["CurrUsage"].isNull()) {
+		std::cerr << "\tMemory information missing" << std::endl;
+		result = false;
+	}
+	else {
+		rules::iterator it;
+		double percentage = root["CurrUsage"].asDouble() / root["SizeOfMem"].asDouble();
+
+		if ((it = r->find("Memory")) != r->end()
+			&& (percentage > it->second)) {
+			std::cerr << "\tMemory exceeds threshold" << std::endl;
+			result = false;
+		}
+	}
 	return result;
 }
 bool check_disk(Json::Value root, rules* r) {

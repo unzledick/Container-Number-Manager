@@ -1,5 +1,18 @@
 {
-   "a" : 1,
-   "b" : 2,
-   "c" : 3
+  "Server": {
+    "Type_1": {
+      "CPU load": 0.8,
+      "Memory": 0.85
+    },
+    "Type_2": {
+      "CPU load": 0.9,
+      "Memory": 0.9,
+      "Network": 10
+    }
+  },
+  "Application": {
+      "Web":{
+          "Response time": 3.0
+      }
+  }
 }
