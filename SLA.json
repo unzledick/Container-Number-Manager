@@ -1,18 +1,27 @@
 {
-  "Server": {
-    "Type_1": {
-      "CPU load": 0.8,
-      "Memory": 0.85
+    "Server": {
+        "Type_1": {
+            "CPU load": 0.8,
+            "Memory": 0.85
+        },
+        "Type_2": {
+            "CPU load": 0.9,
+            "Memory": 0.9,
+            "Network": 10
+        }
     },
-    "Type_2": {
-      "CPU load": 0.9,
-      "Memory": 0.9,
-      "Network": 10
-    }
-  },
-  "Application": {
-      "Web":{
-          "Response time": 3.0
-      }
+    "Application": {
+        "Web":{
+            "Response time": 3.0
+        },
+        "default":{            
+        },
+         "test-project":{             
+            "MemoryUsage": 1200000
+        },
+         "cpu-test":{
+            "CpuUsage": 0.15,
+            "MemoryUsage": 1500000
+        }
   }
 }
