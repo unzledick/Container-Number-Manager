@@ -53,54 +53,17 @@ void go_to_sleep() {
 #endif
 }
 
-bool check_pod_cpu(Json::Value root, rules* r) {
-	bool result = true;
+bool check_pod_item(Json::Value root, std::string item_name, rules* r) {	
+	double usage = root.asDouble();
+	bool result = true;	
 
-	if (root["CpuUsage"].isNull()) {
-		std::cerr << "\tCPU load information missing" << std::endl;
-		result = false;
-	}
-	else {				
-		double CpuUsage = root["CpuUsage"].asDouble();
-
-		if (map_exist("CpuUsage", (*r))){
-			double threshold = (*r)["CpuUsage"];
-			if (CpuUsage > threshold) {
-				std::cerr << "\tCPU load exceeds threshold" << std::endl;
-				result = false;
-			}
+	if (map_exist(item_name, (*r))) {
+		double threshold = (*r)[item_name];
+		if (usage > threshold) {
+			std::cerr << "\t" << item_name << " exceeds threshold" << std::endl;
+			result = false;
 		}
 	}
-	return result;
-}
-bool check_pod_mem(Json::Value root, rules* r) {
-	bool result = true;
-
-	if (root["MemoryUsage"].isNull()) {
-		std::cerr << "\tMemory information missing" << std::endl;
-		result = false;
-	}
-	else {		
-		double percentage = root["MemoryUsage"].asDouble();
-
-		if (map_exist("MemoryUsage", (*r))){
-			double threshold = (*r)["MemoryUsage"];
-			if (percentage > threshold) {
-				std::cerr << "\tMemory exceeds threshold" << std::endl;
-				result = false;
-			}
-		}
-	}
-	return result;
-}
-bool check_pod_disk(Json::Value root, rules* r) {
-	bool result = true;
-	// [TODO]
-	return result;
-}
-bool chech_pod_network(Json::Value root, rules* r) {
-	bool result = true;
-	// [TODO]
 	return result;
 }
 void check_application_pod(Json::Value pod, rules* r) {
@@ -109,13 +72,12 @@ void check_application_pod(Json::Value pod, rules* r) {
 
 	std::cout << "\tpod " << pod_id << "..." << std::endl;
 
-	normal &= check_pod_cpu(pod["Contents"], r);
-	normal &= check_pod_mem(pod["Contents"], r);
-	normal &= check_pod_disk(pod["Contents"], r);
-	normal &= chech_pod_network(pod["Contents"], r);
+	for (Json::Value::iterator it = pod["Contents"].begin(); it != pod["Contents"].end(); it++) {		
+		normal &= check_pod_item(*it, it.name(), r);
+	}
 
 	if (normal) {
-		std::cout << "Normal" << std::endl;
+		std::cout << "\tNormal" << std::endl;
 	}
 }
 void parse_application(Json::Value application) {
