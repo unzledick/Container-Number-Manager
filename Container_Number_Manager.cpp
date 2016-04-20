@@ -13,6 +13,8 @@
 #include <windows.h>
 #endif // __unix__
 
+#define ForEachElementIn(x) for(Json::Value::iterator element = x.begin(); element != x.end(); element++)
+
 #define	FILE_RULES	"SLA.json"
 #define FILE_SERVER	"serverType.json"
 #define	FILE_MDATA	"example.json"
@@ -73,8 +75,8 @@ bool check_application_pod(Json::Value pod, rules* r) {
 
 	std::cout << "\tpod " << pod_id << "..." << std::endl;
 
-	for (Json::Value::iterator it = pod["Contents"].begin(); it != pod["Contents"].end(); it++) {		
-		exceed |= check_pod_item(*it, it.name(), r);
+	ForEachElementIn(pod["Contents"]){	
+		exceed |= check_pod_item(*element, element.name(), r);
 	}
 
 	if (!exceed) {
@@ -86,7 +88,7 @@ void parse_application(Json::Value application) {
 	std::string application_id = application["ApplicationID"].asString();
 	int num_of_pod = application["NumberOfPod"].asInt();
 
-	std::cout << "Checking application " << application_id << "..." << std::endl;
+	std::cout << "Checking application: " << application_id << "..." << std::endl;
 
 	if (!map_exist(application_id, ruleset_application)) {
 		std::cout << "No rules for this application, pass." << std::endl;
@@ -99,8 +101,8 @@ void parse_application(Json::Value application) {
 			Json::Value pods = application["pod"]["PodInfo"];
 
 			bool exceed = false;
-			for (Json::Value::iterator it = pods.begin(); it != pods.end(); it++) {
-				exceed |= check_application_pod((*it), r);
+			ForEachElementIn(pods){			
+				exceed |= check_application_pod((*element), r);
 			}
 			if (exceed) {
 				// [TODO] add a new pod
@@ -113,8 +115,8 @@ void parse_application(Json::Value application) {
 }
 void analyze_data_applicaiton(Json::Value applications) {
 	application_pod_number.clear();
-	for (Json::Value::iterator it = applications.begin(); it != applications.end(); it++){
-		parse_application((*it));
+	ForEachElementIn(applications){	
+		parse_application((*element));
 	}
 }
 
@@ -131,9 +133,9 @@ void build_server_type_mapping(Json::Value root) {
 
 	type_server.clear();
 
-	for (Json::Value::iterator it = root.begin(); it != root.end(); it++) {
-		type = it.key().asString();
-		for (Json::Value::iterator it2 = it->begin(); it2 != it->end(); it2++) {
+	ForEachElementIn(root){	
+		type = element.key().asString();
+		for (Json::Value::iterator it2 = element->begin(); it2 != element->end(); it2++) {
 			name = it2->asString();
 			type_server.insert(std::pair<std::string, std::string>(name, type));
 		}
@@ -141,11 +143,10 @@ void build_server_type_mapping(Json::Value root) {
 }
 
 bool check_server_cpu(Json::Value root, rules* r) {
-	bool result = true;
+	bool exceed = false;
 
 	if (root["Load"].isNull() || root["NumberOfCore"].isNull()) {
-		std::cerr << "\tCPU load information missing" << std::endl;
-		result = false;
+		std::cerr << "\tCPU load information missing" << std::endl;		
 	}
 	else{		
 		double avgLoad = root["Load"].asDouble() / root["NumberOfCore"].asDouble();
@@ -154,18 +155,17 @@ bool check_server_cpu(Json::Value root, rules* r) {
 			double threshold = (*r)["CPU load"];
 			if (avgLoad > threshold) {
 				std::cerr << "\tCPU load exceeds threshold" << std::endl;
-				result = false;
+				exceed = true;
 			}
 		}
 	}
-	return result;
+	return exceed;
 }
 bool check_server_mem(Json::Value root, rules* r) {
-	bool result = true;
+	bool exceed = false;
 
 	if (root["SizeOfMem"].isNull() || root["CurrUsage"].isNull()) {
-		std::cerr << "\tMemory information missing" << std::endl;
-		result = false;
+		std::cerr << "\tMemory information missing" << std::endl;		
 	}
 	else {		
 		double percentage = root["CurrUsage"].asDouble() / root["SizeOfMem"].asDouble();
@@ -174,42 +174,45 @@ bool check_server_mem(Json::Value root, rules* r) {
 			double threshold = (*r)["Memory"];
 			if (percentage > threshold) {
 				std::cerr << "\tMemory exceeds threshold" << std::endl;
-				result = false;
+				exceed = true;
 			}
 		}
 	}
-	return result;
+	return exceed;
 }
 bool check_server_disk(Json::Value root, rules* r) {
-	bool result = true;
+	bool exceed = false;
 	// [TODO]
-	return result;
+	return exceed;
 }
 bool chech_server_network(Json::Value root, rules* r) {
-	bool result = true;
+	bool exceed = false;
 	// [TODO]
-	return result;
+	return exceed;
 }
 void parse_server(Json::Value server) {
 	std::string server_id = server["ServerID"].asString();
 	std::string server_type = query_server_type(server_id);
 
-	std::cout << "Checking server " << server_id << "..." << std::endl;
+	std::cout << "Checking server: " << server_id << "..." << std::endl;
 
 	if (!map_exist(server_type, ruleset_server)) {
 		std::cout << "No rules for the server, pass." << std::endl;
 	}
 	else {
 		rules* r = ruleset_server[server_type];
-		bool normal = true;
+		bool exceed = false;
 
-		normal &= check_server_cpu(server["CoreInfo"], r);
-		normal &= check_server_mem(server["MemInfo"], r);
-		normal &= check_server_disk(server["DiskInfo"], r);
-		normal &= chech_server_network(server["NetworkInfo"], r);
+		exceed |= check_server_cpu(server["CoreInfo"], r);
+		exceed |= check_server_mem(server["MemInfo"], r);
+		exceed |= check_server_disk(server["DiskInfo"], r);
+		exceed |= chech_server_network(server["NetworkInfo"], r);
 
-		if (normal) {
+		if (!exceed) {
 			std::cout << "Normal" << std::endl;
+		}
+		else {
+			// [TODO] suggest open new server
 		}
 	}
 }
@@ -231,10 +234,11 @@ void analyze_data(Json::Value root) {
 }
 
 rules* parse_rules(Json::Value root) {
-	rules* thresholds = new rules();	
-	for (Json::Value::iterator it = root.begin(); it != root.end(); it++) {
-		std::string threshold_name = it.key().asString();
-		double threshold_value = (*it).asDouble();
+	rules* thresholds = new rules();
+
+	ForEachElementIn(root) {	
+		std::string threshold_name = element.key().asString();
+		double threshold_value = (*element).asDouble();
 		thresholds->insert(theshold_pair(threshold_name, threshold_value));
 	}
 	return thresholds;
@@ -245,11 +249,11 @@ void construct_rule_set(Json::Value root, rule_set* rs) {
 	rs->clear();
 	rs->insert(ruleset_pair("", default_rules));
 
-	for (Json::Value::iterator it = root.begin(); it != root.end(); it++) {
-		std::string item_name = it.name();
-		if ((*it).size() > 0
+	ForEachElementIn(root){	
+		std::string item_name = element.name();
+		if ((*element).size() > 0
 			&& !map_exist(item_name, (*rs))){
-			rules* item_rules = parse_rules((*it));
+			rules* item_rules = parse_rules((*element));
 			rs->insert(ruleset_pair(item_name, item_rules));
 		}
 	}
