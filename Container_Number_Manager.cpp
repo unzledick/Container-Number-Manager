@@ -31,6 +31,7 @@ rule_set ruleset_server;
 rule_set ruleset_application;
 
 std::map<std::string, std::string> type_server;
+std::map<std::string, int> application_pod_number;
 
 bool monitorDataUpdate() {
 	// [TODO] check if there are monitor data
@@ -55,33 +56,35 @@ void go_to_sleep() {
 
 bool check_pod_item(Json::Value root, std::string item_name, rules* r) {	
 	double usage = root.asDouble();
-	bool result = true;	
+	bool exceed = false;	
 
 	if (map_exist(item_name, (*r))) {
 		double threshold = (*r)[item_name];
 		if (usage > threshold) {
 			std::cerr << "\t" << item_name << " exceeds threshold" << std::endl;
-			result = false;
+			exceed = true;
 		}
 	}
-	return result;
+	return exceed;
 }
-void check_application_pod(Json::Value pod, rules* r) {
+bool check_application_pod(Json::Value pod, rules* r) {
 	std::string pod_id = pod["PodID"].asString();
-	bool normal = true;
+	bool exceed = false;
 
 	std::cout << "\tpod " << pod_id << "..." << std::endl;
 
 	for (Json::Value::iterator it = pod["Contents"].begin(); it != pod["Contents"].end(); it++) {		
-		normal &= check_pod_item(*it, it.name(), r);
+		exceed |= check_pod_item(*it, it.name(), r);
 	}
 
-	if (normal) {
+	if (!exceed) {
 		std::cout << "\tNormal" << std::endl;
 	}
+	return exceed;
 }
 void parse_application(Json::Value application) {
-	std::string application_id = application["ApplicationID"].asString();	
+	std::string application_id = application["ApplicationID"].asString();
+	int num_of_pod = application["NumberOfPod"].asInt();
 
 	std::cout << "Checking application " << application_id << "..." << std::endl;
 
@@ -95,13 +98,21 @@ void parse_application(Json::Value application) {
 			&& !application["pod"]["PodInfo"].isNull()) {
 			Json::Value pods = application["pod"]["PodInfo"];
 
+			bool exceed = false;
 			for (Json::Value::iterator it = pods.begin(); it != pods.end(); it++) {
-				check_application_pod((*it), r);
+				exceed |= check_application_pod((*it), r);
+			}
+			if (exceed) {
+				// [TODO] add a new pod
+				num_of_pod++;
 			}
 		}
-	}	
+	}
+
+	application_pod_number.insert(std::pair<std::string, int>(application_id, num_of_pod));
 }
 void analyze_data_applicaiton(Json::Value applications) {
+	application_pod_number.clear();
 	for (Json::Value::iterator it = applications.begin(); it != applications.end(); it++){
 		parse_application((*it));
 	}
@@ -255,6 +266,7 @@ void construct_rule_sets_from_tree(Json::Value root) {
 bool read_json_tree_from_file(std::string fname, Json::Value* root){
 	Json::Reader reader;	
 	std::ifstream is;
+	bool result = true;
 
 	is.exceptions(std::ifstream::failbit | std::ifstream::badbit);
 
@@ -267,9 +279,9 @@ bool read_json_tree_from_file(std::string fname, Json::Value* root){
 	}
 	catch(std::ios_base::failure e){
 		std::cerr << "Exceptions on opening/reading file:" << fname << std::endl;
-		return false;
+		result = false;
 	}
-	return true;
+	return result;
 }
 
 int main(int argc, char *argv[])
@@ -281,9 +293,14 @@ int main(int argc, char *argv[])
 	if (read_success) {
 		construct_rule_sets_from_tree(root);
 	}
+	else {
+		exit(-1);
+	}
 
 	read_success = read_json_tree_from_file(FILE_SERVER, &root);
-	build_server_type_mapping(root);
+	if (read_success) {
+		build_server_type_mapping(root);
+	}
 
 	// [TODO] fork a child as daemon to do the following
 
