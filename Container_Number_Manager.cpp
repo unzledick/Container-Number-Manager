@@ -4,6 +4,7 @@
 #include <string>
 #include <map>
 
+#include <getopt.h>
 #include "json/json.h"
 
 #ifdef __unix__
@@ -119,7 +120,7 @@ void analyze_data_applicaiton(Json::Value applications) {
 		parse_application((*element));
 	}
 }
-
+/*----------------------------------------------------------------------------*/
 std::string query_server_type(std::string server_id) {
 	std::string server_type = "";
 	if (map_exist(server_id, type_server)) {
@@ -141,7 +142,7 @@ void build_server_type_mapping(Json::Value root) {
 		}
 	}
 }
-
+/*----------------------------------------------------------------------------*/
 bool check_server_cpu(Json::Value root, rules* r) {
 	bool exceed = false;
 
@@ -219,7 +220,7 @@ void parse_server(Json::Value server) {
 void analyze_data_server(Json::Value root) {
 	//int server_amount = root["NumberOfServer"].asInt();
 	Json::Value servers = root["ServerInfo"];
-	for (int i = 0; i < servers.size(); i++) {
+	for (unsigned int i = 0; i < servers.size(); i++) {
 		parse_server(servers[i]);
 	}
 }
@@ -232,7 +233,7 @@ void analyze_data(Json::Value root) {
 		analyze_data_applicaiton(root[STR_APPLICATION]);
 	}
 }
-
+/*----------------------------------------------------------------------------*/
 rules* parse_rules(Json::Value root) {
 	rules* thresholds = new rules();
 
@@ -287,13 +288,61 @@ bool read_json_tree_from_file(std::string fname, Json::Value* root){
 	}
 	return result;
 }
+/*----------------------------------------------------------------------------*/
+bool usage(const char *exe) {
+	std::cout << std::string(exe) << " [-r rules] [-t server_type] [-m monitor file]" << std::endl;
+			  /* [TODO] add descriptions of input files
+			  << "\t -r ... " << std::endl
+			  << "\t -t ... " << std::endl
+			  << "\t -m ... " << std::endl;
+			  */
 
+	return false;
+}
+bool parse_args(int argc, char *argv[], 
+	std::string* fn_rules, std::string* fn_stype, std::string* fn_mdata) {
+	int c;
+
+	*fn_rules = FILE_RULES;
+	*fn_stype = FILE_SERVER;
+	*fn_mdata = FILE_MDATA;
+
+	while ((c = getopt(argc, argv, "m:r:t:")) != -1) {
+		switch (c)
+		{
+		case 'm':
+			*fn_mdata = std::string(optarg);
+			break;
+		case 'r':
+			*fn_rules = std::string(optarg);
+			break;
+		case 't':
+			*fn_stype = std::string(optarg);
+			break;
+		default:
+			return usage(argv[0]);
+		}
+	};
+
+	return true;
+}
+/*----------------------------------------------------------------------------*/
 int main(int argc, char *argv[])
 {
 	Json::Value root;
 	bool read_success = false;
 
-	read_success = read_json_tree_from_file(FILE_RULES, &root);
+	std::string	filename_rules = "";
+	std::string	filename_stype = "";
+	std::string	filename_mdata = "";
+
+	read_success = parse_args(argc, argv, 
+		&filename_rules, &filename_stype, &filename_mdata);
+	if (!read_success) {
+		return 0;
+	}
+
+	read_success = read_json_tree_from_file(filename_rules, &root);
 	if (read_success) {
 		construct_rule_sets_from_tree(root);
 	}
@@ -301,7 +350,7 @@ int main(int argc, char *argv[])
 		exit(-1);
 	}
 
-	read_success = read_json_tree_from_file(FILE_SERVER, &root);
+	read_success = read_json_tree_from_file(filename_stype, &root);
 	if (read_success) {
 		build_server_type_mapping(root);
 	}
@@ -314,7 +363,7 @@ int main(int argc, char *argv[])
 			continue;
 		}
 
-		read_success = read_json_tree_from_file(FILE_MDATA, &root);
+		read_success = read_json_tree_from_file(filename_mdata, &root);
 		if (read_success) {
 			analyze_data(root);
 		}		
