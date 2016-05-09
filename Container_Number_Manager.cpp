@@ -5,6 +5,7 @@
 #include <map>
 
 #include "json/json.h"
+#include "/home/ricktsai/rick_lib/include/curl/curl.h"
 
 #ifdef __unix__
 #include <unistd.h>
@@ -288,8 +289,8 @@ bool read_json_tree_from_file(std::string fname, Json::Value* root){
 	return result;
 }
 
-int main(int argc, char *argv[])
-{
+void read_information_from_json(){
+
 	Json::Value root;
 	bool read_success = false;
 
@@ -319,6 +320,27 @@ int main(int argc, char *argv[])
 			analyze_data(root);
 		}		
 	};
+}
+
+void read_information_from_API(){
+	
+	CURL *curl;
+	curl = curl_easy_init();
+	CURLcode res;
+
+	curl_easy_setopt(curl, CURLOPT_URL, "172.30.57.109:80/api/v1/model/nodes");
+	res = curl_easy_perform(curl);
+	printf("%s\n",res);	
+
+}
+
+int main(int argc, char *argv[])
+{
+	
+	//read_information_from_json();
+	read_information_from_API();
+	
+
 
 	return 0;
 }
