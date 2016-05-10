@@ -23,89 +23,118 @@ def del_obj_in_tree(root):
         else:                   # delete successfully
             break
 
+def show_curr_rules(obj):
+    for r in iter(obj):
+        print(r)
+        pass
 
-def mod_obj(obj_name):
-    print('omg')
+def mod_rules_in_obj(root, key):
+    clear_screen()
+
+    if(root is not ''):
+        show_curr_rules(root)
+    else:
+        print('There is no rule for',key)
+
+    if input('Modify?(Y/[N])').capitalize() is 'Y':
+        # [TODO]
+        # modify all rules
+        pass
+
+def mod_obj_in_tree(root):
+    while(True):
+        obj_name = input('enter name:')
+
+        if(obj_name is ''):     # empty input, return
+            break
+        if(obj_name not in root):
+            print('Does not existed')
+        else:            
+            mod_rules_in_obj(root[obj_name], obj_name)
+            break;
 
 def add_obj_to_tree(root):
-    input_name = input('enter name:')
+    
+    obj_name = input('enter name:')
 
-    if(input_name is ''):       # empty input, return
+    if(obj_name is ''):         # empty input, return
         return
 
-    if(input_name in root):
+    if(obj_name in root):
         print('Already existed')
-    else:
-        # [TODO] call modify 
-        # result = mod_obj(input_name)
-        # root.update({input_name:result})
-        root.update({input_name:''})
+    else:      
+        root.update({obj_name:''})
 
-def show_sub_tree(tName):
-    print('Current Contents in', tName)
+def show_sub_tree(root, key):
+    print('Current Contents in', key)
     
-    for obj in iter(rule_tree[tName]):
+    for obj in iter(root[key]):
         print('\t',obj)
+    print()
 
-def modify_sub_tree(tName):
+def modify_sub_tree(root, key):
 
-    msg_2 = '1) Add\n'
-    if(tName in rule_tree):
-        msg_2 += '2) Modify\n3) Delete\n'        
-    msg_2 += 'b) Back\n'       
+    if(root[key] is ''):
+        root.update({key:dict()})            
 
     while(True):
+        menu_2_msg = '1) Add\n'
+        if(len(root[key]) > 0):
+            menu_2_msg += '2) Modify\n3) Delete\n'        
+        menu_2_msg += 'b) Back\n'       
+    
         clear_screen()
-        show_sub_tree(tName)
-        option = input(msg_2)
+        show_sub_tree(root, key)
+        option = input(menu_2_msg)
 
         if(option == '1'):
-            add_obj_to_tree(rule_tree[tName])
+            add_obj_to_tree(root[key])
         elif(option == '2'):
-            print('2')
+            mod_obj_in_tree(root[key])
         elif(option == '3'):
-            del_obj_in_tree(rule_tree[tName])
+            del_obj_in_tree(root[key])
         elif(option == 'b'):
             break;
         else:
             continue;
 
 # start here!
-#print('This is a Python script that helps you configrues the server and application rules.')
-
 try:
     f = open('SLA.json', 'r+')
-except IOError:
-    f = open('SLA.json', 'w')
-    print('New configure file has been created.')
-
-rule_tree = json.load(f)
+except IOError:                 # file not exsits
+    f = open('SLA.json', 'w+')
+    json.dump({'Server':'', 'Application':''}, f, sort_keys = True, indent=4)    
+    f.flush()
+    f.seek(0)
+ 
+try:
+    rule_tree = json.load(f)
+except ValueError:
+    print('Input file is not in JSON format')
+    f.close()
+    sys.exit()
 
 f.close()
 
-msg_1 =  '1) Modify Server Rules\n'
-msg_1 += '2) Modify Application Rules\n'
-msg_1 += '3) Save the current settings\n'
-msg_1 += '4) exit\n'
-msg_1 += 'Please select your option:\n'
+menu_1_msg =  '1) Modify Server Rules\n'
+menu_1_msg += '2) Modify Application Rules\n'
+menu_1_msg += '3) Save and Exit\n'
+menu_1_msg += '4) Exit without Saving\n\n'
+menu_1_msg += 'Please select your option:\n'
 
 while(True):
     clear_screen() 
-    user_option = input(msg_1)
+    user_option = input(menu_1_msg)
 
     if(user_option == '1'):
-        modify_sub_tree('Server')
-    elif(user_option == '2'):
-        modify_sub_tree('Application')
+        modify_sub_tree(rule_tree, 'Server')
+    elif(user_option == '2'):        
+        modify_sub_tree(rule_tree, 'Application')
     elif(user_option == '3'):
-        try:
-            f = open('SLA.json', 'r+')
-        except IOError:
-            print('Something wrong QQ')
-        f.close()
+        with open('SLA.json', 'w') as outfile:
+            json.dump(rule_tree, outfile, sort_keys = True, indent=4)
+        break;
     elif(user_option == '4'):
         break
     else:
         continue
-
-#json.dump();
