@@ -25,6 +25,20 @@
 
 #define T_SLEEP_MS	500
 
+//Rick part =============================================================
+
+std::string  HEAPSTER_IP = "172.30.58.224:80";
+std::string  NAMESPACE = "container-number-manager2"; 
+std::string  RC_NAME = "cnm-app";
+#define TYPE_NAMESPACE 1
+#define TYPE_NODE 2
+#define RESOURCE_CPU 1
+#define RESOURCE_MEMORY 2
+//#define USE_WHILE 
+//#define USE_DAEMON
+
+//Rick part =============================================================
+
 typedef std::map<std::string, std::map<std::string, double>*> rule_set;
 typedef std::map<std::string, double> rules;
 typedef std::pair<std::string, rules*> ruleset_pair;
@@ -98,7 +112,7 @@ void parse_application(Json::Value application) {
 		rules* r = ruleset_application[application_id];
 
 		if (!application["pod"].isNull()
-			&& !application["pod"]["PodInfo"].isNull()) {
+				&& !application["pod"]["PodInfo"].isNull()) {
 			Json::Value pods = application["pod"]["PodInfo"];
 
 			bool exceed = false;
@@ -151,7 +165,7 @@ bool check_server_cpu(Json::Value root, rules* r) {
 	}
 	else{		
 		double avgLoad = root["Load"].asDouble() / root["NumberOfCore"].asDouble();
-		
+
 		if (map_exist("CPU load", (*r))){
 			double threshold = (*r)["CPU load"];
 			if (avgLoad > threshold) {
@@ -253,7 +267,7 @@ void construct_rule_set(Json::Value root, rule_set* rs) {
 	ForEachElementIn(root){	
 		std::string item_name = element.name();
 		if ((*element).size() > 0
-			&& !map_exist(item_name, (*rs))){
+				&& !map_exist(item_name, (*rs))){
 			rules* item_rules = parse_rules((*element));
 			rs->insert(ruleset_pair(item_name, item_rules));
 		}
@@ -289,7 +303,7 @@ bool read_json_tree_from_file(std::string fname, Json::Value* root){
 	return result;
 }
 
-void read_information_from_json(){
+void read_information_from_file(){
 
 	Json::Value root;
 	bool read_success = false;
@@ -322,25 +336,90 @@ void read_information_from_json(){
 	};
 }
 
-void read_information_from_API(){
-	
+size_t WriteToString (void *contents, size_t size, size_t nmemb, void *userp){
+	*((std::string*)userp) += (char*)contents;
+	return size * nmemb;
+}
+
+long long int get_resource_usage(int type, std::string name ,std::string resource){
+
 	CURL *curl;
 	curl = curl_easy_init();
 	CURLcode res;
 
-	curl_easy_setopt(curl, CURLOPT_URL, "172.30.57.109:80/api/v1/model/nodes");
-	res = curl_easy_perform(curl);
-	printf("%s\n",res);	
+	std::string temp;	
+	std::string curl_ip;
+	
+	//printf("%d\n",type);	
+	switch(type){
+		case TYPE_NAMESPACE:
+			curl_ip = HEAPSTER_IP + "/api/v1/model/namespaces/" + name + "/metrics/" + resource;
+			break;
+		case TYPE_NODE:
+			curl_ip = HEAPSTER_IP + "/api/v1/model/nodes/" + name + "/metrics/" + resource;
+			break;
+	}
+	
+	//std::cout << curl_ip << std::endl;
 
+	curl_easy_setopt(curl, CURLOPT_URL, &curl_ip[0u]);
+	curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, WriteToString);
+	curl_easy_setopt(curl, CURLOPT_WRITEDATA, &temp);	
+	
+	res = curl_easy_perform(curl);
+	if(res != 0)
+		printf("Curl failed.\n");
+	
+	//std::cout << temp << std::endl;
+	
+	Json::Reader reader;
+	Json::Value root;
+
+	reader.parse(temp.c_str(),root);	
+
+	//std::cout << root["metrics"][0]["value"].asString() << std::endl;	
+		
+	return (long long int)root["metrics"][0]["value"].asLargestUInt();
 }
+
+void read_information_from_API(){
+	
+	int cpu = get_resource_usage(TYPE_NAMESPACE,NAMESPACE,"cpu-usage");
+	long long int mem = get_resource_usage(TYPE_NAMESPACE,NAMESPACE,"memory-usage");
+
+	printf("cpu: %d\n",cpu);
+	printf("mem: %lld\n",mem);
+#ifdef USE_DAEMON	
+	daemon(1,1);
+#endif
+
+#ifdef USE_WHILE
+	while(1){
+#endif	
+
+
+		std::string scale_instruction = "kubectl scale rc " + RC_NAME + " --replicas=3";
+
+		//system(&scale_instruction[0u]);
+#ifdef USE_WHILE
+	}
+#endif
+}
+
+void get_node_usage(){
+	printf("node1 cpu = %d.\n",get_resource_usage(TYPE_NODE,"opsm1.pcs.csie.ntu.edu.tw","cpu-usage"));
+	printf("node1 mem = %lld.\n",get_resource_usage(TYPE_NODE,"opsm1.pcs.csie.ntu.edu.tw","memory-usage"));
+	printf("node2 cpu = %d.\n",get_resource_usage(TYPE_NODE,"opsn1.pcs.csie.ntu.edu.tw","cpu-usage"));
+	printf("node2 mem = %lld.\n",get_resource_usage(TYPE_NODE,"opsn1.pcs.csie.ntu.edu.tw","memory-usage"));
+} 
 
 int main(int argc, char *argv[])
 {
-	
-	//read_information_from_json();
+
+	//daemon(1,1);	
+	//read_information_from_file();
+	get_node_usage();
 	read_information_from_API();
 	
-
-
-	return 0;
+	exit(0);
 }
