@@ -12,18 +12,30 @@ make Container_Number_Manager
 ```
 ##### Run:  
 ```
-./Container_Number_Manager.o format.json  
+./Container_Number_Manager [-r rules] [-t server_type] [-m monitor file]  
 ```
+* -r 預設為 SLA.json
+* -t 預設為 serverType.json
+* -m 預設為 example.json 
     
 ## SLA.json:  
 server 及 application 的 SLA 規則
-   
-## format.json  
-預設 monitor 輸出 / container number manager 輸入 格式  
 
 ## serverType.json
 儲存 server 名稱及其對應類型的資訊
    
 ## example.json  
 monitor 輸出的觀測資訊，測試用
+
+## format.json  
+預設 monitor 輸出 / container number manager 輸入 格式
   
+## CHT_configure_rules.py
+互動式 SLA 規則修改 script
+提供一個簡單的方式去更新 SLA.json 的內容
+若同一資料夾中無 SLA.json，則新建立一個
+
+##### Run:
+```
+python CHT_configure_rules.py
+```
