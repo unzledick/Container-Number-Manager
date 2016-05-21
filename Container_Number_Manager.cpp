@@ -3,9 +3,16 @@
 #include <iostream>
 #include <string>
 #include <map>
+#include <sstream>
 
 #include "json/json.h"
 #include "/home/ricktsai/rick_lib/include/curl/curl.h"
+#include <time.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <sys/time.h>
+#include <sys/timeb.h>
+#include <cmath>
 
 #ifdef __unix__
 #include <unistd.h>
@@ -23,18 +30,30 @@
 #define STR_SERVER	"Server"
 #define STR_APPLICATION	"Application"
 
-#define T_SLEEP_MS	500
+#define T_SLEEP_MS	1000
 
 //Rick part =============================================================
 
-std::string  HEAPSTER_IP = "172.30.58.224:80";
+//should be get from json
+std::string  HEAPSTER_IP = "172.30.178.127:80";
 std::string  NAMESPACE = "container-number-manager2"; 
 std::string  RC_NAME = "cnm-app";
+int CPU_LIMIT = 400; //milli-core
+long long int  MEMORY_LIMIT = 512*1024*1024; //byte 
+int POD_NUMBER = 5;
+#define SERVER_NUMBER 2
+const std::string Server[2] ={"opsm1.pcs.csie.ntu.edu.tw","opsn1.pcs.csie.ntu.edu.tw"};
+double Server_capacity_memory[2]={11857728*1024LL,3596144*1024LL};
+double Server_capacity_cpu[2]={8000,4000};
+
+//type defineldw
 #define TYPE_NAMESPACE 1
 #define TYPE_NODE 2
 #define RESOURCE_CPU 1
 #define RESOURCE_MEMORY 2
-//#define USE_WHILE 
+
+//runnung test
+#define USE_WHILE 
 //#define USE_DAEMON
 
 //Rick part =============================================================
@@ -67,7 +86,7 @@ void go_to_sleep() {
 #ifdef WINDOWS
 	Sleep(T_SLEEP_MS);
 #else
-	usleep(T_SLEEP_MS);
+	sleep(1);
 #endif
 }
 
@@ -305,6 +324,7 @@ bool read_json_tree_from_file(std::string fname, Json::Value* root){
 
 void read_information_from_file(){
 
+
 	Json::Value root;
 	bool read_success = false;
 
@@ -321,7 +341,9 @@ void read_information_from_file(){
 		build_server_type_mapping(root);
 	}
 
-	// [TODO] fork a child as daemon to do the following
+#ifdef USE_DAEMON	
+	daemon(1,1);
+#endif
 
 	while (1) {
 		if (!monitorDataUpdate()) {
@@ -349,7 +371,7 @@ long long int get_resource_usage(int type, std::string name ,std::string resourc
 
 	std::string temp;	
 	std::string curl_ip;
-	
+
 	//printf("%d\n",type);	
 	switch(type){
 		case TYPE_NAMESPACE:
@@ -359,67 +381,246 @@ long long int get_resource_usage(int type, std::string name ,std::string resourc
 			curl_ip = HEAPSTER_IP + "/api/v1/model/nodes/" + name + "/metrics/" + resource;
 			break;
 	}
-	
+
 	//std::cout << curl_ip << std::endl;
 
 	curl_easy_setopt(curl, CURLOPT_URL, &curl_ip[0u]);
 	curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, WriteToString);
 	curl_easy_setopt(curl, CURLOPT_WRITEDATA, &temp);	
-	
+	curl_easy_setopt(curl, CURLOPT_CONNECTTIMEOUT, 900);
+	curl_easy_setopt(curl, CURLOPT_TIMEOUT,1000);
+
 	res = curl_easy_perform(curl);
 	if(res != 0)
-		printf("Curl failed.\n");
-	
+		printf("Curl failed: %d\n", res);
+
 	//std::cout << temp << std::endl;
-	
+
 	Json::Reader reader;
 	Json::Value root;
 
 	reader.parse(temp.c_str(),root);	
 
 	//std::cout << root["metrics"][0]["value"].asString() << std::endl;	
-		
+
 	return (long long int)root["metrics"][0]["value"].asLargestUInt();
 }
 
-void read_information_from_API(){
+long long getSystemTime() {
+	struct timeb t;
+	ftime(&t);
+	return 1000 * t.time + t.millitm;
+}
+
+int choose_server(double pod_cpu, double pod_memory){
+	//Server_capacity_memory[]
+	//Server_capacity_cpu[]
+	double cpu;
+	double mem;
+	double score_before,score_after,score_diff,minimal_diff;
+	int server_chosen= -1;
+	for(int i = 0;i<SERVER_NUMBER;i++){
+		cpu = get_resource_usage(TYPE_NODE,Server[i],"cpu-usage");
+		mem = get_resource_usage(TYPE_NODE,Server[i],"memory-usage");
+		if((Server_capacity_cpu[i]-cpu> pod_cpu) && (Server_capacity_memory[i]-mem> pod_memory)){
+			server_chosen = i;
+		}	
+	}
+
+	if(server_chosen == -1){
+		printf("Server not enough.\n");
+		return -1;
+	}
+	else if(server_chosen == SERVER_NUMBER-1)
+		return server_chosen;
+
+	for(int i = server_chosen+1;i<SERVER_NUMBER;i++){
+
+		cpu = get_resource_usage(TYPE_NODE,Server[i],"cpu-usage");
+		mem = get_resource_usage(TYPE_NODE,Server[i],"memory-usage");
+		//printf("node %d cpu=%f\n",i,cpu/Server_capacity_cpu[i]);
+		//printf("node %d mem=%f\n",i,mem/Server_capacity_memory[i]);
+		score_before = std::abs(cpu/Server_capacity_cpu[i]-mem/Server_capacity_memory[i]);
+		//printf("score=%f\n",score_before);
+		cpu += pod_cpu;
+		mem += pod_memory;
+		//printf("node %d cpu=%f\n",i,cpu/Server_capacity_cpu[i]);
+		//printf("node %d mem=%f\n",i,mem/Server_capacity_memory[i]);
+		score_after = std::abs(cpu/Server_capacity_cpu[i]-mem/Server_capacity_memory[i]);
+		//printf("score=%f\n",score_after);
+		score_diff = score_after - score_before;	
+		//printf("score=%f\n",score_diff);
+		if((Server_capacity_cpu[i]-cpu> pod_cpu) && (Server_capacity_memory[i]-mem> pod_memory)){	
+			if(score_diff<minimal_diff){
+				minimal_diff = score_diff;
+				server_chosen = i;			
+			}
+		}		
+
+	}	
+	printf("Server chosen = %d\n",server_chosen);
+	return server_chosen;
+}
+
+void analyze_ap_metrics(){
+
+	FILE *fp;
+	char path[1000];
+	char pod_name[100][1000];
+	int pod_number = 0; 
+	char* command = (char*)malloc(1000*sizeof(char));
+	printf("\nApplication level metrics:\n");
+	printf("==========================\n");
+
+
+	//get pod
+	fp = popen("oc get pod --namespace=container-number-manager2|grep cnm-app|awk '{print$1}'","r");
+	if(fp==NULL)
+		printf("failed\n");
+	while(fgets(path, sizeof(path)-1, fp) != NULL){
+		strcpy(pod_name[pod_number],path);
+		pod_name[pod_number][strlen(pod_name[pod_number])-1] = 0;
+		printf("Pod %d: %s\n",pod_number,pod_name[pod_number]);
+		pod_number += 1;
+	}
+
+	//get heap memory
+	strcpy(command,"kubectl exec ");
+	strcat(command,pod_name[0]);
+	strcat(command,"  -- ./../../opt/eap/bin/jboss-cli.sh --connect /core-service=platform-mbean/type=memory:read-attribute'('name=heap-memory-usage')' | grep used | awk '{print$3}'");	
+	fp = popen(command,"r");
+	if(fp==NULL)
+                printf("failed\n");
+	fgets(path, sizeof(path)-1, fp);
+	path[strlen(path)-2]=0;		
+        printf("Heap memory used: %lld\n",atoll(path));
+
+	//get thread count
+	strcpy(command,"kubectl exec ");
+        strcat(command,pod_name[0]);        
+	strcat(command," -- ./../../opt/eap/bin/jboss-cli.sh --connect /core-service=platform-mbean/type=threading:read-attribute'('name=thread-count')' | grep result | awk '{print$3}'");	
+	fp = popen(command,"r");
+	if(fp==NULL)
+        	printf("failed\n");
+	fgets(path, sizeof(path)-1, fp);
+	printf("Thread count: %d\n",atoi(path));
+
+	//get current thread cpu time 
+	strcpy(command,"kubectl exec ");
+        strcat(command,pod_name[0]);
+        strcat(command," -- ./../../opt/eap/bin/jboss-cli.sh --connect /core-service=platform-mbean/type=threading:read-attribute'('name=current-thread-cpu-time')' | grep result | awk '{print$3}'");
+	fp = popen(command,"r");
+        if(fp==NULL)
+                printf("failed\n");
+        fgets(path, sizeof(path)-1, fp);
+        path[strlen(path)-2]=0;
+        printf("Current thread cpu time: %lld\n",atoll(path));
+
+	//get http connector request count
+	strcpy(command,"kubectl exec ");
+        strcat(command,pod_name[0]);
+        strcat(command," -- ./../../opt/eap/bin/jboss-cli.sh --connect /subsystem=web/connector=http:read-attribute'('name=requestCount')' | grep result | awk '{print$3}'");
+	fp = popen(command,"r");
+        if(fp==NULL)
+                printf("failed\n");
+        fgets(path, sizeof(path)-1, fp);
+        for(int i = 1;i<strlen(path);i++)
+		path[i-1] = path[i];
+	path[strlen(path)-3]=0;
+	printf("Http connector request count: %d\n",atoi(path));	
 	
+			
+
+}
+
+void analyze_resource_usage(){
+
 	int cpu = get_resource_usage(TYPE_NAMESPACE,NAMESPACE,"cpu-usage");
 	long long int mem = get_resource_usage(TYPE_NAMESPACE,NAMESPACE,"memory-usage");
-
+	
+	printf("\nResource usage:\n");
+	printf("===============\n");
 	printf("cpu: %d\n",cpu);
 	printf("mem: %lld\n",mem);
+	printf("cpu limit: %d\n",CPU_LIMIT);
+	printf("mem limit: %lld\n",MEMORY_LIMIT);
+
+	if(cpu > CPU_LIMIT * 0.8 * POD_NUMBER || mem > MEMORY_LIMIT * 0.8 * POD_NUMBER ){
+
+		POD_NUMBER += 1;
+		std::stringstream ss;
+		std::string POD_NUMBER_STRING;
+		ss << POD_NUMBER; 
+		ss >> POD_NUMBER_STRING; 
+
+		std::string scale_instruction = "kubectl scale rc " + RC_NAME + " --replicas=" + POD_NUMBER_STRING;
+		std::cout << scale_instruction << std::endl;
+		int server = choose_server((double)CPU_LIMIT,(double)MEMORY_LIMIT); 
+		if(server == -1)
+			printf("Scale up failed\n");
+		//system(&scale_instruction[0u]);
+	
+	}
+	else{
+		printf("resource enough.\n");
+	}
+
+}
+
+void read_information_from_API(){
+
+	Json::Value root;
+	bool read_success = false;
+
+	read_success = read_json_tree_from_file(FILE_RULES, &root);
+	if (read_success) {
+		construct_rule_sets_from_tree(root);
+	}
+	else {
+		exit(-1);
+	}
+
+	read_success = read_json_tree_from_file(FILE_SERVER, &root);
+	if (read_success) {
+		build_server_type_mapping(root);
+	}
+	//for(std::map<std::string, std::string>::iterator iter = type_server.begin(); iter != type_server.end(); iter++)
+	//	std::cout<<iter->first<<" "<<iter->second<<std::endl;
+
 #ifdef USE_DAEMON	
 	daemon(1,1);
 #endif
 
+	//struct timeval start, end;
+	long long start=getSystemTime()-15000;
 #ifdef USE_WHILE
 	while(1){
 #endif	
+		long long end=getSystemTime();	
 
-
-		std::string scale_instruction = "kubectl scale rc " + RC_NAME + " --replicas=3";
-
-		//system(&scale_instruction[0u]);
+		if(end-start>=15*1000){
+			start = end;
+			analyze_resource_usage();
+			analyze_ap_metrics();			
+		}
+		else{
+			go_to_sleep();
+			end=getSystemTime();
+			//printf("end:%lld\n",end);
+			//printf("start:%lld\n",start);
+			//printf("time:%d\n",(end-start)/1000);
+		}	
 #ifdef USE_WHILE
 	}
 #endif
 }
 
-void get_node_usage(){
-	printf("node1 cpu = %d.\n",get_resource_usage(TYPE_NODE,"opsm1.pcs.csie.ntu.edu.tw","cpu-usage"));
-	printf("node1 mem = %lld.\n",get_resource_usage(TYPE_NODE,"opsm1.pcs.csie.ntu.edu.tw","memory-usage"));
-	printf("node2 cpu = %d.\n",get_resource_usage(TYPE_NODE,"opsn1.pcs.csie.ntu.edu.tw","cpu-usage"));
-	printf("node2 mem = %lld.\n",get_resource_usage(TYPE_NODE,"opsn1.pcs.csie.ntu.edu.tw","memory-usage"));
-} 
 
 int main(int argc, char *argv[])
 {
 
-	//daemon(1,1);	
 	//read_information_from_file();
-	get_node_usage();
 	read_information_from_API();
-	
+
 	exit(0);
 }
