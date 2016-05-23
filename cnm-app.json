@@ -1,0 +1,30 @@
+{
+  "kind": "Pod",
+  "apiVersion": "v1",
+  "metadata": {
+    "name": "cnm-app-1",
+    "labels": {
+      "name": "cnm-app"
+    }
+  },
+  "spec": {
+    "containers": [
+      {
+        "name": "cnm-app",
+        "image": "jane801030/ticket-test",
+        "ports": [
+          {
+            "containerPort": 8000,
+            "protocol": "TCP"
+          }
+        ],
+	"resources": {
+          "limits": {
+            "cpu": "1200m",
+            "memory": "512Mi"
+          }
+        }
+      }
+    ]
+  }
+}
