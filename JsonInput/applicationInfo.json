@@ -1,0 +1,12 @@
+[
+   {
+      "applicationID" : "ticket-test",
+      "nodeSelector" : "name=ticket-test",
+      "replicationController" : "ticket-test"
+   },
+   {
+      "applicationID" : "heapster",
+      "nodeSelector" : "name=heapster",
+      "replicationController" : "heapster"
+   }
+]

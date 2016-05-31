@@ -11,13 +11,17 @@
         }
     },
     "Application": {
-        "Web":{
-            "Response time": 3.0
+        "heapster":{
+            "CpuUsage": 160
         },
-        "default":{            
+        "default":{
+            "CpuUsage": 0.15,
+            "MemoryUsage": 1500000            
         },
-         "test-project":{             
-            "MemoryUsage": 1200000
+         "ticket-test":{
+            "CpuUsage": 400,             
+            "MemoryUsage": 1200000,
+            "AvgResponseTime": 10
         },
          "cpu-test":{
             "CpuUsage": 0.15,

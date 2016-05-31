@@ -15,9 +15,9 @@
 
 #define ForEachElementIn(x) for(Json::Value::iterator element = x.begin(); element != x.end(); element++)
 
-#define	FILE_RULES	"SLA.json"
-#define FILE_SERVER	"serverType.json"
-#define	FILE_MDATA	"example.json"
+#define	FILE_RULES	"JsonInput/SLA.json"
+#define FILE_SERVER	"JsonInput/serverType.json"
+#define	FILE_MDATA	"JsonInput/monitoringOutput.json"
 
 #define STR_SERVER	"Server"
 #define STR_APPLICATION	"Application"
@@ -34,6 +34,8 @@ rule_set ruleset_application;
 
 std::map<std::string, std::string> type_server;
 std::map<std::string, int> application_pod_number;
+
+Json::Value Servers;
 
 bool monitorDataUpdate() {
 	// [TODO] check if there are monitor data
@@ -56,7 +58,7 @@ void go_to_sleep() {
 #endif
 }
 
-bool check_pod_item(Json::Value root, std::string item_name, rules* r) {	
+bool check_item(Json::Value root, std::string item_name, rules* r) {	
 	double usage = root.asDouble();
 	bool exceed = false;	
 
@@ -76,13 +78,17 @@ bool check_application_pod(Json::Value pod, rules* r) {
 	std::cout << "\tpod " << pod_id << "..." << std::endl;
 
 	ForEachElementIn(pod["Contents"]){	
-		exceed |= check_pod_item(*element, element.name(), r);
+		exceed |= check_item(*element, element.name(), r);
 	}
 
 	if (!exceed) {
 		std::cout << "\tNormal" << std::endl;
 	}
 	return exceed;
+}
+void add_new_pod() {
+	for (int i = 0; i < Servers.size(); i++) {
+	}	
 }
 void parse_application(Json::Value application) {
 	std::string application_id = application["ApplicationID"].asString();
@@ -95,9 +101,13 @@ void parse_application(Json::Value application) {
 	}
 	else{
 		rules* r = ruleset_application[application_id];
-
-		if (!application["pod"].isNull()
-			&& !application["pod"]["PodInfo"].isNull()) {
+		
+		if (check_item(application["AvgResponseTime"],"AvgResponseTime",r)) {
+			add_new_pod();
+                        num_of_pod++;			
+		} 
+		else if (!application["pod"].isNull()
+				&& !application["pod"]["PodInfo"].isNull()) {
 			Json::Value pods = application["pod"]["PodInfo"];
 
 			bool exceed = false;
@@ -105,7 +115,7 @@ void parse_application(Json::Value application) {
 				exceed |= check_application_pod((*element), r);
 			}
 			if (exceed) {
-				// [TODO] add a new pod
+				add_new_pod();
 				num_of_pod++;
 			}
 		}
@@ -150,7 +160,7 @@ bool check_server_cpu(Json::Value root, rules* r) {
 	}
 	else{		
 		double avgLoad = root["Load"].asDouble() / root["NumberOfCore"].asDouble();
-		
+
 		if (map_exist("CPU load", (*r))){
 			double threshold = (*r)["CPU load"];
 			if (avgLoad > threshold) {
@@ -218,9 +228,10 @@ void parse_server(Json::Value server) {
 }
 void analyze_data_server(Json::Value root) {
 	//int server_amount = root["NumberOfServer"].asInt();
-	Json::Value servers = root["ServerInfo"];
-	for (int i = 0; i < servers.size(); i++) {
-		parse_server(servers[i]);
+	Servers = root["ServerInfo"];
+
+	for (int i = 0; i < Servers.size(); i++) {
+		parse_server(Servers[i]);
 	}
 }
 
@@ -252,7 +263,7 @@ void construct_rule_set(Json::Value root, rule_set* rs) {
 	ForEachElementIn(root){	
 		std::string item_name = element.name();
 		if ((*element).size() > 0
-			&& !map_exist(item_name, (*rs))){
+				&& !map_exist(item_name, (*rs))){
 			rules* item_rules = parse_rules((*element));
 			rs->insert(ruleset_pair(item_name, item_rules));
 		}
@@ -308,17 +319,17 @@ int main(int argc, char *argv[])
 
 	// [TODO] fork a child as daemon to do the following
 
-	while (1) {
-		if (!monitorDataUpdate()) {
-			go_to_sleep();
-			continue;
-		}
+	//while (1) {
+	if (!monitorDataUpdate()) {
+		go_to_sleep();
+		//continue;
+	}
 
-		read_success = read_json_tree_from_file(FILE_MDATA, &root);
-		if (read_success) {
-			analyze_data(root);
-		}		
-	};
+	read_success = read_json_tree_from_file(FILE_MDATA, &root);
+	if (read_success) {
+		analyze_data(root);
+	}		
+	//};
 
 	return 0;
 }

@@ -1,6 +1,6 @@
 {
     "Server":{
-        "NumberOfServer": 2,
+        "NumberOfServer": 10,
         "ServerInfo": [
             {
                 "ServerID": 0,
@@ -17,7 +17,29 @@
             },
             {
                 "ServerID": 1,
-                "..." : "..."
+                "CoreInfo": {
+                    "NumberOfCore": 2,
+                    "Load": 0.9
+                },
+                "MemInfo":{
+                    "SizeOfMem": 1024,
+                    "CurrUsage": 512
+                },
+                "DiskInfo":{},
+                "NetworkInfo":{}
+            },
+            {
+                "ServerID": 2,
+                "CoreInfo": {
+                    "NumberOfCore": 2,
+                    "Load": 0.9
+                },
+                "MemInfo":{
+                    "SizeOfMem": 1024,
+                    "CurrUsage": 512
+                },
+                "DiskInfo":{},
+                "NetworkInfo":{}
             }
         ]
     },
