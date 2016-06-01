@@ -8,6 +8,7 @@ all: Container_Number_Manager make_SLA_json
 	
 Container_Number_Manager: Container_Number_Manager.cpp
 	g++ -std=c++11 $(INC) $(LIB) Container_Number_Manager.cpp -o Container_Number_Manager.o local_lib/lib/linux-gcc-4.8.5/libjson_linux-gcc-4.8.5_libmt.a
+	./Container_Number_Manager.o
 
 json: make_application_info.cpp
 	g++ -std=c++11 $(INC) $(LIB) make_application_info.cpp -o make_application_info.o local_lib/lib/linux-gcc-4.8.5/libjson_linux-gcc-4.8.5_libmt.a

@@ -3,8 +3,7 @@
 #include <iostream>
 #include <string>
 #include <map>
-
-#include "json/json.h"
+#include <json/json.h>
 
 #ifdef __unix__
 #include <unistd.h>
@@ -86,8 +85,42 @@ bool check_application_pod(Json::Value pod, rules* r) {
 	}
 	return exceed;
 }
-void add_new_pod() {
-	for (int i = 0; i < Servers.size(); i++) {
+double get_pod_cpu(Json::Value pod){
+	if(pod["Contents"]["CpuLimit"].asDouble() == -1)
+		return pod["Contents"]["CpuUsage"].asDouble();
+	else
+		return pod["Contents"]["CpuLimit"].asDouble();
+}
+double get_pod_memory(Json::Value pod){
+	if(pod["Contents"]["MemoryLimit"].asDouble() == -1)
+                return pod["Contents"]["MemoryUsage"].asDouble();
+        else
+                return pod["Contents"]["MemoryLimit"].asDouble();
+}
+double get_score(double server_cpu_usage, double server_cpu_limit,
+	double server_memory_usage, double server_memory_limit){
+	
+	
+}
+double get_score_diff(Json::Value Server, Json::Value pod){
+	double pod_cpu = get_pod_cpu(pod);
+	double pod_memory = get_pod_memory(pod);
+	double server_cpu_usage = server["CoreInfo"]["Load"].asDouble();
+	double server_cpu_limit = server["CoreInfo"]["NumberOfCore"].asDouble();
+	double server_memory_usage = server["MemInfo"]["CurrUsage"].asDouble();
+	double server_memory_limit = server["MemInfo"]["SizeOfMem"].asDouble();
+	double score_before = get_score(server_cpu_usage,server_cpu_limit,
+		server_memory_usage,server_memory_limit);
+	double score_after = get_score(server_cpu_usage+pod_cpu/1000,
+		server_cpu_limit,
+	return score_after-score_before;
+}
+void add_new_pod(Json::Value pod) {
+	//printf("cpu limit = %f\n", pod_cpu);
+	//printf("memory limit = %f\n",pod_memory);
+	ForEachElementIn(Servers){
+		double score = get_score_diff((*element),pod);
+		//printf("server core = %f\n.",(*element)["CoreInfo"]["NumberOfCore"].asDouble());		
 	}	
 }
 void parse_application(Json::Value application) {
@@ -101,21 +134,21 @@ void parse_application(Json::Value application) {
 	}
 	else{
 		rules* r = ruleset_application[application_id];
+		Json::Value pods = application["pod"]["PodInfo"];
 		
 		if (check_item(application["AvgResponseTime"],"AvgResponseTime",r)) {
-			add_new_pod();
+			add_new_pod(pods[0]);
                         num_of_pod++;			
 		} 
 		else if (!application["pod"].isNull()
 				&& !application["pod"]["PodInfo"].isNull()) {
-			Json::Value pods = application["pod"]["PodInfo"];
 
 			bool exceed = false;
 			ForEachElementIn(pods){			
 				exceed |= check_application_pod((*element), r);
 			}
 			if (exceed) {
-				add_new_pod();
+				add_new_pod(pods[0]);
 				num_of_pod++;
 			}
 		}
@@ -223,6 +256,7 @@ void parse_server(Json::Value server) {
 		}
 		else {
 			// [TODO] suggest open new server
+			printf("Server not enough.");
 		}
 	}
 }
