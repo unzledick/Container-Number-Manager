@@ -3,7 +3,7 @@
         "NumberOfServer": 1, 
         "ServerInfo": [
             {
-                "ServerID": "wmnet202.cs.nthu.edu.tw", 
+                "ServerID": "140.112.29.244", 
                 "CoreInfo": {
                     "NumberOfCore": 5, 
                     "Load": 0.9396011805454545

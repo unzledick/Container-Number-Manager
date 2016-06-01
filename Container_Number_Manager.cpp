@@ -4,6 +4,7 @@
 #include <string>
 #include <map>
 #include <json/json.h>
+#include <cmath>
 
 #ifdef __unix__
 #include <unistd.h>
@@ -17,6 +18,7 @@
 #define	FILE_RULES	"JsonInput/SLA.json"
 #define FILE_SERVER	"JsonInput/serverType.json"
 #define	FILE_MDATA	"JsonInput/monitoringOutput.json"
+#define FILE_APP_INFO	"JsonInput/applicationInfo.json"
 
 #define STR_SERVER	"Server"
 #define STR_APPLICATION	"Application"
@@ -33,8 +35,16 @@ rule_set ruleset_application;
 
 std::map<std::string, std::string> type_server;
 std::map<std::string, int> application_pod_number;
+std::map<std::string, std::map<std::string, std::string>> app_info;
 
 Json::Value Servers;
+
+//Mode choose======================================================
+//#define USE_SYSTEM
+//#define USE_WHILE 
+//#define USE_DAEMON
+#define PRINT_DEBUG
+//Mode choose======================================================
 
 bool monitorDataUpdate() {
 	// [TODO] check if there are monitor data
@@ -70,6 +80,7 @@ bool check_item(Json::Value root, std::string item_name, rules* r) {
 	}
 	return exceed;
 }
+
 bool check_application_pod(Json::Value pod, rules* r) {
 	std::string pod_id = pod["PodID"].asString();
 	bool exceed = false;
@@ -85,48 +96,103 @@ bool check_application_pod(Json::Value pod, rules* r) {
 	}
 	return exceed;
 }
+
 double get_pod_cpu(Json::Value pod){
 	if(pod["Contents"]["CpuLimit"].asDouble() == -1)
 		return pod["Contents"]["CpuUsage"].asDouble();
 	else
 		return pod["Contents"]["CpuLimit"].asDouble();
 }
+
 double get_pod_memory(Json::Value pod){
 	if(pod["Contents"]["MemoryLimit"].asDouble() == -1)
                 return pod["Contents"]["MemoryUsage"].asDouble();
         else
                 return pod["Contents"]["MemoryLimit"].asDouble();
 }
+
 double get_score(double server_cpu_usage, double server_cpu_limit,
 	double server_memory_usage, double server_memory_limit){
-	
-	
+	return std::fabs(server_cpu_usage/server_cpu_limit -
+		server_memory_usage/server_memory_limit);
 }
-double get_score_diff(Json::Value Server, Json::Value pod){
+
+double get_score_diff(Json::Value server, Json::Value pod){
 	double pod_cpu = get_pod_cpu(pod);
 	double pod_memory = get_pod_memory(pod);
 	double server_cpu_usage = server["CoreInfo"]["Load"].asDouble();
 	double server_cpu_limit = server["CoreInfo"]["NumberOfCore"].asDouble();
 	double server_memory_usage = server["MemInfo"]["CurrUsage"].asDouble();
 	double server_memory_limit = server["MemInfo"]["SizeOfMem"].asDouble();
-	double score_before = get_score(server_cpu_usage,server_cpu_limit,
-		server_memory_usage,server_memory_limit);
-	double score_after = get_score(server_cpu_usage+pod_cpu/1000,
-		server_cpu_limit,
+	double score_before = get_score(server_cpu_usage, server_cpu_limit,
+		server_memory_usage, server_memory_limit);
+	double score_after = get_score(server_cpu_usage + pod_cpu/1000,
+		server_cpu_limit, server_memory_usage + pod_memory,
+		server_memory_limit);
+#ifdef PRINT_DEBUG
+	printf("score before = %f\n",score_before);
+	printf("score after = %f\n",score_after);
+#endif
 	return score_after-score_before;
 }
-void add_new_pod(Json::Value pod) {
-	//printf("cpu limit = %f\n", pod_cpu);
-	//printf("memory limit = %f\n",pod_memory);
-	ForEachElementIn(Servers){
-		double score = get_score_diff((*element),pod);
-		//printf("server core = %f\n.",(*element)["CoreInfo"]["NumberOfCore"].asDouble());		
-	}	
+
+void deploy(Json::Value application, std::string server_name){
+	std::string application_id = application["ApplicationID"].asString();
+	std::string nodeSelector = app_info[application_id]["nodeSelector"];	
+	std::string rc = app_info[application_id]["replicationController"];
+	std::string number_of_pod = application["pod"]["NumberOfPod"].asString();
+	
+	//label node
+	std::string instruction = "kubectl label node " + server_name + " " + nodeSelector;
+#ifdef PRINT_DEBUG
+	std::cout << instruction << std::endl;
+#endif
+#ifdef USE_SYSTEM
+	system(&instruction[0u]);
+#endif
+
+	//scale up rc
+	instruction = "kubectl scale rc/" + rc + " --replicas=" + number_of_pod;
+#ifdef PRINT_DEBUG
+	std::cout << instruction << std::endl;
+#endif
+#ifdef USE_SYSTEM
+	system(&instruction[0u]);
+#endif
+	
+	//cancel label
+	instruction = "kubectl label node " + server_name + " name-";
+#ifdef PRINT_DEBUG
+        std::cout << instruction << std::endl;
+#endif
+#ifdef USE_SYSTEM
+	system(&instruction[0u]);
+#endif
+
 }
+void schedule_new_pod(Json::Value application) {
+	Json::Value pod = application["pod"]["PodInfo"][0]; 
+	int min_score_diff = get_score_diff(Servers[0],pod);
+	int min_score_diff_server = 0;
+	if(Servers.size() > 1){ 
+		double score_diff;
+		for(int i = 1; i < Servers.size(); i++){
+			score_diff = get_score_diff(Servers[i],pod);
+#ifdef PRINT_DEBUG
+			printf("score diff = %f\n.",score_diff);		
+#endif
+			if (score_diff < min_score_diff){
+				min_score_diff = score_diff;
+				min_score_diff_server = i;
+			}
+		}
+	}	
+	deploy(application,Servers[min_score_diff_server]["ServerID"].asString());
+}
+
 void parse_application(Json::Value application) {
 	std::string application_id = application["ApplicationID"].asString();
-	int num_of_pod = application["NumberOfPod"].asInt();
-
+	int num_of_pod = application["pod"]["NumberOfPod"].asInt();
 	std::cout << "Checking application: " << application_id << "..." << std::endl;
 
 	if (!map_exist(application_id, ruleset_application)) {
@@ -137,7 +203,7 @@ void parse_application(Json::Value application) {
 		Json::Value pods = application["pod"]["PodInfo"];
 		
 		if (check_item(application["AvgResponseTime"],"AvgResponseTime",r)) {
-			add_new_pod(pods[0]);
+			schedule_new_pod(application);
                         num_of_pod++;			
 		} 
 		else if (!application["pod"].isNull()
@@ -148,7 +214,7 @@ void parse_application(Json::Value application) {
 				exceed |= check_application_pod((*element), r);
 			}
 			if (exceed) {
-				add_new_pod(pods[0]);
+				schedule_new_pod(application);
 				num_of_pod++;
 			}
 		}
@@ -332,7 +398,12 @@ bool read_json_tree_from_file(std::string fname, Json::Value* root){
 	}
 	return result;
 }
-
+void construct_application_information(Json::Value info){
+	ForEachElementIn(info){	
+		app_info[(*element)["applicationID"].asString()]["nodeSelector"] = (*element)["nodeSelector"].asString();
+		app_info[(*element)["applicationID"].asString()]["replicationController"] = (*element)["replicationController"].asString();
+	}
+}
 int main(int argc, char *argv[])
 {
 	Json::Value root;
@@ -351,19 +422,33 @@ int main(int argc, char *argv[])
 		build_server_type_mapping(root);
 	}
 
-	// [TODO] fork a child as daemon to do the following
 
-	//while (1) {
+	// [TODO] fork a child as daemon to do the following
+#ifdef USE_DAEMON
+	daemon(1,1);
+#endif
+
+#ifdef USE_WHILE
+	while (1) {
+#endif
 	if (!monitorDataUpdate()) {
 		go_to_sleep();
-		//continue;
+#ifdef USE_WHILE
+		continue;
+#endif
+	}
+
+	read_success = read_json_tree_from_file(FILE_APP_INFO, &root);
+	if (read_success) {
+		construct_application_information(root);
 	}
 
 	read_success = read_json_tree_from_file(FILE_MDATA, &root);
 	if (read_success) {
 		analyze_data(root);
 	}		
-	//};
-
+#ifdef USE_WHILE
+	};
+#endif
 	return 0;
 }
