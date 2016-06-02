@@ -2,12 +2,14 @@
     "Server": {
         "Type_1": {
             "CPU load": 0.8,
-            "Memory": 0.85
+            "Memory": 0.85,
+            "Network received": 500000000000,
+            "Network sent": 90000000000,
+            "Disk": 0.1
         },
         "Type_2": {
             "CPU load": 0.9,
             "Memory": 0.9,
-            "Network": 10
         }
     },
     "Application": {

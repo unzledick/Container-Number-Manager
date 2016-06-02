@@ -298,12 +298,45 @@ bool check_server_mem(Json::Value root, rules* r) {
 }
 bool check_server_disk(Json::Value root, rules* r) {
 	bool exceed = false;
-	// [TODO]
+	        if (root["FilesystemLimit"].isNull() || root["FilesystemUsage"].isNull()) {
+                std::cerr << "\tDisk information missing" << std::endl;
+        }
+        else {
+                double percentage = root["FilesystemUsage"].asDouble() / root["FilesystemLimit"].asDouble();
+
+                if (map_exist("Disk", (*r))){
+                        double threshold = (*r)["Disk"];
+                        if (percentage > threshold) {
+                                std::cerr << "\tDisk exceeds threshold" << std::endl;
+                                exceed = true;
+                        }
+                }
+        }
 	return exceed;
 }
 bool chech_server_network(Json::Value root, rules* r) {
 	bool exceed = false;
-	// [TODO]
+	        if (root["ReceivedCumulativeBytes"].isNull() || root["SentCumulativeBytes"].isNull()) {
+                std::cerr << "\tNetwork information missing" << std::endl;
+        }
+        else {
+                double network_receive  = root["ReceivedCumulativeBytes"].asDouble();
+		double network_sent  = root["SentCumulativeBytes"].asDouble();
+                if (map_exist("Network received", (*r))){
+                        double threshold = (*r)["Network received"];
+                        if (network_receive > threshold) {
+                                std::cerr << "\tNetwork received exceeds threshold" << std::endl;
+                                exceed = true;
+                        }
+                }
+		if (map_exist("Network sent", (*r))){
+                        double threshold  = (*r)["Network sent"];
+                        if (network_sent > threshold) {
+                                std::cerr << "\tNetwork sent exceeds threshold" << std::endl;
+                                exceed = true;
+                        }
+                }
+        }
 	return exceed;
 }
 void parse_server(Json::Value server) {
