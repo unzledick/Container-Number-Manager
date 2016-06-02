@@ -3,8 +3,9 @@
 #include <iostream>
 #include <string>
 #include <map>
-#include <json/json.h>
 #include <cmath>
+#include <json/json.h>
+#include <sys/timeb.h>
 
 #ifdef __unix__
 #include <unistd.h>
@@ -22,8 +23,8 @@
 
 #define STR_SERVER	"Server"
 #define STR_APPLICATION	"Application"
-
-#define T_SLEEP_MS	500
+#define T_SLEEP_MS	1000
+#define MONITER_TIME	15
 
 typedef std::map<std::string, std::map<std::string, double>*> rule_set;
 typedef std::map<std::string, double> rules;
@@ -41,9 +42,9 @@ Json::Value Servers;
 
 //Mode choose======================================================
 //#define USE_SYSTEM
-//#define USE_WHILE 
+#define USE_WHILE 
 //#define USE_DAEMON
-#define PRINT_DEBUG
+//#define PRINT_DEBUG
 //Mode choose======================================================
 
 bool monitorDataUpdate() {
@@ -63,8 +64,14 @@ void go_to_sleep() {
 #ifdef WINDOWS
 	Sleep(T_SLEEP_MS);
 #else
-	usleep(T_SLEEP_MS);
+	usleep(T_SLEEP_MS*1000);
 #endif
+}
+
+long long getSystemTime() {
+	struct timeb t;
+	ftime(&t);
+	return 1000 * t.time + t.millitm;
 }
 
 bool check_item(Json::Value root, std::string item_name, rules* r) {	
@@ -428,26 +435,33 @@ int main(int argc, char *argv[])
 	daemon(1,1);
 #endif
 
+
+
 #ifdef USE_WHILE
+	long long start=getSystemTime() - MONITER_TIME*1000;	
+	long long end;	
+
 	while (1) {
+		end=getSystemTime();
+		if(end-start < MONITER_TIME*1000){
+			go_to_sleep();
+			end=getSystemTime();
+			continue;
+		}
+		else{		
+			start = end;
 #endif
-	if (!monitorDataUpdate()) {
-		go_to_sleep();
-#ifdef USE_WHILE
-		continue;
-#endif
-	}
+			read_success = read_json_tree_from_file(FILE_APP_INFO, &root);
+			if (read_success) {
+				construct_application_information(root);
+			}
 
-	read_success = read_json_tree_from_file(FILE_APP_INFO, &root);
-	if (read_success) {
-		construct_application_information(root);
-	}
-
-	read_success = read_json_tree_from_file(FILE_MDATA, &root);
-	if (read_success) {
-		analyze_data(root);
-	}		
+			read_success = read_json_tree_from_file(FILE_MDATA, &root);
+			if (read_success) {
+				analyze_data(root);
+			}		
 #ifdef USE_WHILE
+		}
 	};
 #endif
 	return 0;
