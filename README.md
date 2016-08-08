@@ -2,7 +2,7 @@
 
 檢查由 monitor 得到的 server 及 application 資訊，與預先定好的規則(rules)做比較，判斷是否需要增加 application 使用的 pod/container 數量。
    
-## Container_Number_Manager.cpp:  
+## Container_Number_Manager.cpp 
 * 讀入 SLA.json 中 server 及 application 的 SLA 規則  
 * 讀入 example.json 的觀測資訊，並判斷每個 application 是否需要增加 pod/container     
 
@@ -15,7 +15,7 @@ make Container_Number_Manager
 ./Container_Number_Manager.o format.json  
 ```
     
-## SLA.json:  
+## SLA.json
 server 及 application 的 SLA 規則
    
 ## format.json  
