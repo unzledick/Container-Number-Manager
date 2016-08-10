@@ -4,26 +4,28 @@
    
 ## Container_Number_Manager.cpp 
 * 讀入 SLA.json 中 server 及 application 的 SLA 規則  
-* 讀入 example.json 的觀測資訊，並判斷每個 application 是否需要增加 pod/container     
+* 讀入 monitoringOutput.json 的觀測資訊，並判斷每個 application 是否需要增加 pod/container     
 
-##### Compile:   
+##### Compile & Run:   
 ```
-make Container_Number_Manager  
+make  
 ```
-##### Run:  
-```
-./Container_Number_Manager.o format.json  
-```
-    
-## SLA.json
+
+##local_lib
+包含了json的lib跟include,在red hat的linux時不用安裝json。在非red hat的linux時不一定適用。
+
+##JsonInput
+Container_Number_Manager.cpp 所需要使用的json檔,包含：
+ 
+### SLA.json
 server 及 application 的 SLA 規則
    
-## format.json  
-預設 monitor 輸出 / container number manager 輸入 格式  
+### monitoringOutput.json  
+monitor 得到的 server 及 application 資訊  
 
-## serverType.json
+### serverType.json
 儲存 server 名稱及其對應類型的資訊
    
-## example.json  
-monitor 輸出的觀測資訊，測試用
+### applicationInfo.json  
+application的nodeSelector跟replication controller資訊,Container-Number-Manager在調整application的pod數量的instruction所需
   
