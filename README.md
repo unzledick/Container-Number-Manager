@@ -17,15 +17,15 @@ make
 ##JsonInput
 Container_Number_Manager.cpp 所需要使用的json檔,包含：
  
-### SLA.json
+#### SLA.json
 server 及 application 的 SLA 規則
    
-### monitoringOutput.json  
+#### monitoringOutput.json  
 monitor 得到的 server 及 application 資訊  
 
-### serverType.json
+#### serverType.json
 儲存 server 名稱及其對應類型的資訊
    
-### applicationInfo.json  
+#### applicationInfo.json  
 application的nodeSelector跟replication controller資訊,Container-Number-Manager在調整application的pod數量的instruction所需
   
