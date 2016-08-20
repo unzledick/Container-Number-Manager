@@ -20,8 +20,12 @@
 // descriptions of files are in README.md
 #define	FILE_RULES	"JsonInput/SLA.json"
 #define FILE_SERVER	"JsonInput/serverType.json"
-#define	FILE_MDATA	"../../CHT/program/monitoringOutput.json"
+//#define	FILE_MDATA	"../../CHT/program/monitoringOutput.json"
+#define	FILE_MDATA	"JsonInput/monitoringOutput.json"
 #define FILE_APP_INFO	"JsonInput/applicationInfo.json"
+
+//test application name, experiment use
+#define TEST_APPLICATION "ticket-test"
 
 //json use
 #define STR_SERVER	"Server"
@@ -31,7 +35,10 @@
 #define T_SLEEP_MS	1000
 
 //how long in seconds to check monitoringOutput.json
-#define MONITER_TIME	60
+#define MONITER_TIME	15
+
+//after how many consecutive minutes the monitored data does not exceed th SLA, the Container Number Manager scales down the application
+#define SCALE_DOWN_COUNT 5
 
 //map define
 typedef std::map<std::string, std::map<std::string, double>*> rule_set;
@@ -44,9 +51,12 @@ std::map<std::string, std::string> type_server;
 std::map<std::string, int> application_pod_number;
 std::map<std::string, std::map<std::string, std::string>> app_info;
 
-Json::Value Servers;
+//scale down count record of application
+std::map<std::string, int> scale_down_count;
+std::map<std::string, int> temp_scale_down_count;
 
-int scale_down_count= 0;
+//server 
+Json::Value Servers;
 
 //experiment testing use
 int response_count = 0;
@@ -192,10 +202,10 @@ void deploy(Json::Value application, std::string server_name){
 	//label node
 	std::string instruction = "kubectl label node " + server_name + " " + nodeSelector;
 #ifdef PRINT_DEBUG
-	//std::cout << instruction << std::endl;
+	std::cout << instruction << std::endl;
 #endif
 #ifdef USE_SYSTEM
-	//system(&instruction[0u]);
+	system(&instruction[0u]);
 #endif
 
 	//scale up rc
@@ -211,10 +221,10 @@ void deploy(Json::Value application, std::string server_name){
 	//cancel label
 	instruction = "kubectl label node " + server_name + " name-";
 #ifdef PRINT_DEBUG
-    //std::cout << instruction << std::endl;
+    	std::cout << instruction << std::endl;
 #endif
 #ifdef USE_SYSTEM
-	//system(&instruction[0u]);
+	system(&instruction[0u]);
 #endif
 
 }
@@ -265,6 +275,27 @@ void schedule_new_pod(Json::Value application) {
 	deploy(application,Servers[min_score_diff_server]["ServerID"].asString());
 }
 
+//check if we need to scale down the number of pod
+bool check_scale_down(Json::Value application){
+	
+	int count = scale_down_count.count(application["ApplicationID"].asString());
+	
+	//update scale_down_count
+	if(count == 0)
+		temp_scale_down_count[application["ApplicationID"].asString()] = 1;
+	else
+		temp_scale_down_count[application["ApplicationID"].asString()] = 
+			scale_down_count[application["ApplicationID"].asString()]+1;
+
+	//check if exceed SCALE_DOWN_COUNT
+	if(temp_scale_down_count[application["ApplicationID"].asString()] == SCALE_DOWN_COUNT){
+		close(application);
+		temp_scale_down_count.erase(application["ApplicationID"].asString());
+		return true;
+	}
+	return false;
+}
+
 // check if application's monitored data exceeds threshold
 void parse_application(Json::Value application) {
 	std::string application_id = application["ApplicationID"].asString();
@@ -280,7 +311,7 @@ void parse_application(Json::Value application) {
 
 		rules* r = ruleset_application[application_id];
 		Json::Value pods = application["pod"]["PodInfo"];
-		
+
 		//*experiment testing use
 		if(application_id=="ticket-monster"){
 			response_time[response_count] = application["AvgResponseTime"].asDouble();
@@ -289,15 +320,16 @@ void parse_application(Json::Value application) {
 			for(int i = 0; i< response_count;i++){
 				printf("%d %f\n",i,response_time[i]);
 			}
-			
+
 		}
+
 
 		//check application's response time
 		if (check_item(application["AvgResponseTime"],"AvgResponseTime",r)) {
 			schedule_new_pod(application);
-                        num_of_pod++;			
+			num_of_pod++;			
 		}
-		
+
 		//check pod's monitored data 
 		else if (!application["pod"].isNull()
 				&& !application["pod"]["PodInfo"].isNull()) {
@@ -312,21 +344,16 @@ void parse_application(Json::Value application) {
 				schedule_new_pod(application);
 				num_of_pod++;
 			}
-			
+
 			//scale down
-			else{
-				if(num_of_pod > 1){
-					if(scale_down_count > 5){
-						close(application);
-						scale_down_count = 0;
-					}
-					else{
-						scale_down_count++;
-					}
-				}	
+			else if(num_of_pod>1){
+				if(check_scale_down(application))
+					num_of_pod--;
 			}
 
 		}
+
+
 	}
 
 	application_pod_number.insert(std::pair<std::string, int>(application_id, num_of_pod));
@@ -334,11 +361,22 @@ void parse_application(Json::Value application) {
 
 // check if applications' monitored data exceeds threshold
 void analyze_data_applicaiton(Json::Value applications) {
-	application_pod_number.clear();
+
+ 	application_pod_number.clear();
 	ForEachElementIn(applications){	
 		parse_application((*element));
 	}
+
+	//clear temporary scale down count
+	scale_down_count = temp_scale_down_count;
+	temp_scale_down_count.clear();
+
+#ifdef PRINT_DEBUG
+	printf("Test application scale_down_count:%d\n",scale_down_count[TEST_APPLICATION]);
+#endif
+
 }
+
 
 // return the type of server
 std::string query_server_type(std::string server_id) {
@@ -409,63 +447,63 @@ bool check_server_mem(Json::Value root, rules* r) {
 
 //check server if its monitored disk usage exceeds threshold
 bool check_server_disk(Json::Value root, rules* r) {
-	
+
 	bool exceed = false;
-	
+
 	if (root["FilesystemLimit"].isNull() || root["FilesystemUsage"].isNull()) {
-        std::cerr << "\tDisk information missing" << std::endl;
-    }
-    else {
-        double percentage = root["FilesystemUsage"].asDouble() / root["FilesystemLimit"].asDouble();
-        if (map_exist("Disk", (*r))){
+		std::cerr << "\tDisk information missing" << std::endl;
+	}
+	else {
+		double percentage = root["FilesystemUsage"].asDouble() / root["FilesystemLimit"].asDouble();
+		if (map_exist("Disk", (*r))){
 			double threshold = (*r)["Disk"];
-            if (percentage > threshold) {
-                std::cerr << "\tDisk exceeds threshold" << std::endl;
-                exceed = true;
-            }
-        }
-    }
+			if (percentage > threshold) {
+				std::cerr << "\tDisk exceeds threshold" << std::endl;
+				exceed = true;
+			}
+		}
+	}
 
 	return exceed;
 }
 
 //check server if its monitored network usage exceeds threshold
 bool chech_server_network(Json::Value root, rules* r) {
-	
+
 	bool exceed = false;
-	
+
 	if (root["ReceivedCumulativeBytes"].isNull() || root["SentCumulativeBytes"].isNull()) {
-            std::cerr << "\tNetwork information missing" << std::endl;
-    }
-    else {
-        
+		std::cerr << "\tNetwork information missing" << std::endl;
+	}
+	else {
+
 		double network_receive  = root["ReceivedCumulativeBytes"].asDouble();
 		double network_sent  = root["SentCumulativeBytes"].asDouble();
-        
+
 		if (map_exist("Network received", (*r))){
-            double threshold = (*r)["Network received"];
-                if (network_receive > threshold) {
-                    std::cerr << "\tNetwork received exceeds threshold" << std::endl;
-                    exceed = true;
-                }
-		}
-		
-		if (map_exist("Network sent", (*r))){
-			double threshold  = (*r)["Network sent"];
-            if (network_sent > threshold) {
-                std::cerr << "\tNetwork sent exceeds threshold" << std::endl;
-                exceed = true;
-            }
+			double threshold = (*r)["Network received"];
+			if (network_receive > threshold) {
+				std::cerr << "\tNetwork received exceeds threshold" << std::endl;
+				exceed = true;
+			}
 		}
 
-    }
-	
+		if (map_exist("Network sent", (*r))){
+			double threshold  = (*r)["Network sent"];
+			if (network_sent > threshold) {
+				std::cerr << "\tNetwork sent exceeds threshold" << std::endl;
+				exceed = true;
+			}
+		}
+
+	}
+
 	return exceed;
 }
 
 //check one server if its monitored data exceeds threshold
 void parse_server(Json::Value server) {
-	
+
 	std::string server_id = server["ServerID"].asString();
 	std::string server_type = query_server_type(server_id);
 
@@ -495,7 +533,7 @@ void parse_server(Json::Value server) {
 
 //check all servers if their monitored data exceeds threshold
 void analyze_data_server(Json::Value root) {
-	
+
 	//int server_amount = root["NumberOfServer"].asInt();
 	Servers = root["ServerInfo"];
 
