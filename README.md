@@ -1,6 +1,7 @@
 # Container-Number-Manager
 
 檢查由 monitor 得到的 server 及 application 資訊，與預先定好的規則(rules)做比較，判斷是否需要增加 application 使用的 pod/container 數量。
+當觀測資訊值小於 SLA 累積達到五次時，減少application 使用的 pod/container 數量。
    
 ## Container_Number_Manager.cpp 
 * 讀入 SLA.json 中 server 及 application 的 SLA 規則  
