@@ -40,6 +40,9 @@
 //after how many consecutive minutes the monitored data does not exceed th SLA, the Container Number Manager scales down the application
 #define SCALE_DOWN_COUNT 5
 
+//if the monitored data is below SCALE_DOWN_PERCENTAGE * SLA, SCALE_DOWN_COUNT += 1
+#define SCALE_DOWN_PERCENTAGE 1
+
 //map define
 typedef std::map<std::string, std::map<std::string, double>*> rule_set;
 typedef std::map<std::string, double> rules;
@@ -112,35 +115,44 @@ long long getSystemTime() {
 }
 
 //check if the monitored pod data and the response time of application exceeds threshold 
-bool check_item(Json::Value root, std::string item_name, rules* r) {	
+int check_item(Json::Value root, std::string item_name, rules* r) {	
 	double usage = root.asDouble();
-	bool exceed = false;	
+	int exceed = 0;	
 
 	if (map_exist(item_name, (*r))) {
 		double threshold = (*r)[item_name];
 		if (usage > threshold) {
 			std::cerr << "\t" << item_name << " exceeds threshold" << std::endl;
-			exceed = true;
+			exceed = 1;
+		}
+		else if( usage < threshold * SCALE_DOWN_PERCENTAGE){
+			exceed = -1;
 		}
 	}
 	return exceed;
 }
 
 //check pod if its monitored data exceeds threshold
-bool check_application_pod(Json::Value pod, rules* r) {
+int check_application_pod(Json::Value pod, rules* r) {
 	std::string pod_id = pod["PodID"].asString();
 	bool exceed = false;
+	bool scale_down = true;
 
 	std::cout << "\tpod " << pod_id << "..." << std::endl;
 
 	ForEachElementIn(pod["Contents"]){	
-		exceed |= check_item(*element, element.name(), r);
+		int check = (check_item(*element, element.name(), r) == 1);
+		exceed |= (check == 1);
+		scale_down &= (check == -1);
 	}
 
+	if(scale_down)
+		return -1;
 	if (!exceed) {
 		std::cout << "\tNormal" << std::endl;
+		return 0;
 	}
-	return exceed;
+	return 1;
 }
 
 //return the cpu of a pod
@@ -323,9 +335,12 @@ void parse_application(Json::Value application) {
 
 		}
 
-
+		bool scale_down = true;;		
+	
 		//check application's response time
-		if (check_item(application["AvgResponseTime"],"AvgResponseTime",r)) {
+		int check = check_item(application["AvgResponseTime"],"AvgResponseTime",r);
+		scale_down &= (check == -1);
+		if (check == 1) {
 			schedule_new_pod(application);
 			num_of_pod++;			
 		}
@@ -336,7 +351,9 @@ void parse_application(Json::Value application) {
 
 			bool exceed = false;
 			ForEachElementIn(pods){			
-				exceed |= check_application_pod((*element), r);
+				check = check_application_pod((*element), r);
+				exceed |= (check == 1);
+				scale_down &= (check == -1);
 			}
 
 			//exceed threshold
@@ -346,7 +363,7 @@ void parse_application(Json::Value application) {
 			}
 
 			//scale down
-			else if(num_of_pod>1){
+			else if(num_of_pod>1&&scale_down){
 				if(check_scale_down(application))
 					num_of_pod--;
 			}

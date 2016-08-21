@@ -22,8 +22,8 @@
         },
          "ticket-test":{
             "CpuUsage": 400,             
-            "MemoryUsage": 1200000,
-            "AvgResponseTime": 10
+            "MemoryUsage": 1610612736,
+            "AvgResponseTime": 15
         },
          "cpu-test":{
             "CpuUsage": 0.15,
