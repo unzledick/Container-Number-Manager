@@ -41,7 +41,7 @@
 #define SCALE_DOWN_COUNT 5
 
 //if the monitored data is below SCALE_DOWN_PERCENTAGE * SLA, SCALE_DOWN_COUNT += 1
-#define SCALE_DOWN_PERCENTAGE 1
+#define SCALE_DOWN_PERCENTAGE 1.0
 
 //map define
 typedef std::map<std::string, std::map<std::string, double>*> rule_set;
@@ -129,6 +129,9 @@ int check_item(Json::Value root, std::string item_name, rules* r) {
 			exceed = -1;
 		}
 	}
+	else
+		exceed = -1;
+
 	return exceed;
 }
 
@@ -141,7 +144,7 @@ int check_application_pod(Json::Value pod, rules* r) {
 	std::cout << "\tpod " << pod_id << "..." << std::endl;
 
 	ForEachElementIn(pod["Contents"]){	
-		int check = (check_item(*element, element.name(), r) == 1);
+		int check = check_item(*element, element.name(), r) ;
 		exceed |= (check == 1);
 		scale_down &= (check == -1);
 	}
@@ -361,9 +364,8 @@ void parse_application(Json::Value application) {
 				schedule_new_pod(application);
 				num_of_pod++;
 			}
-
 			//scale down
-			else if(num_of_pod>1&&scale_down){
+			else if(num_of_pod>1 && scale_down){
 				if(check_scale_down(application))
 					num_of_pod--;
 			}
@@ -389,7 +391,7 @@ void analyze_data_applicaiton(Json::Value applications) {
 	temp_scale_down_count.clear();
 
 #ifdef PRINT_DEBUG
-	printf("Test application scale_down_count:%d\n",scale_down_count[TEST_APPLICATION]);
+	printf("All monitored data of %s is below %f*SLA, count: %d\n",TEST_APPLICATION,SCALE_DOWN_PERCENTAGE,scale_down_count[TEST_APPLICATION]);
 #endif
 
 }
